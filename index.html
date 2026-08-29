@@ -1,0 +1,1136 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<title>Мой прогресс</title>
+<style>
+:root {
+  --bg: #ffffff; --card: #ffffff; --card2: #f4f4f5; --text: #1a1a1a; --muted: #6b7280;
+  --line: #e5e7eb; --yellow: #e6a800; --orange: #ff6b00;
+  --shadow: 0 4px 20px rgba(0,0,0,0.06); --radius: 20px;
+  --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); }
+body { padding-bottom: 90px; }
+.app { width: min(100%, 720px); margin: auto; padding: 16px 16px 24px; }
+nav { position: fixed; left: 0; right: 0; bottom: 0; height: 78px; background: rgba(255,255,255,0.97);
+  backdrop-filter: blur(12px); border-top: 1px solid var(--line); display: flex; justify-content: center;
+  z-index: 20; padding-bottom: env(safe-area-inset-bottom); box-shadow: 0 -2px 12px rgba(0,0,0,0.04); }
+nav button { flex: 1; max-width: 160px; background: transparent; color: var(--muted); border: 0;
+  border-radius: 0; padding: 10px 2px 8px; font-size: 11px; font-weight: 600; cursor: pointer;
+  transition: color 0.2s, transform 0.1s; letter-spacing: 0.3px; }
+nav button span { display: block; font-size: 24px; line-height: 28px; margin-bottom: 2px; }
+nav button.active { color: var(--orange); font-weight: 800; }
+nav button:active { transform: scale(0.92); }
+.page { display: none; }
+.page.active { display: block; }
+h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; margin: 0; color: var(--text); }
+h2 { font-size: 19px; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.3px; color: var(--text); }
+h3 { font-size: 16px; font-weight: 600; margin: 0 0 6px; }
+.muted { color: var(--muted); font-size: 13px; }
+.hint { color: var(--muted); font-size: 12.5px; line-height: 1.4; margin: 2px 0 14px; }
+.small { font-size: 12px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 20px; margin: 14px 0; box-shadow: var(--shadow); }
+.card2 { background: var(--card2); border-radius: var(--radius); padding: 18px; margin: 12px 0; }
+button { border: 0; border-radius: 14px; padding: 12px 20px; font-weight: 700; cursor: pointer;
+  transition: all 0.15s; background: linear-gradient(135deg, var(--yellow), var(--orange));
+  color: #ffffff; font-size: 15px; letter-spacing: 0.3px; }
+button:active { transform: scale(0.96); }
+button.secondary { background: var(--card2); color: var(--text); border: 1px solid var(--line); }
+button.danger { background: #fdeaea; color: #c62828; border: 1px solid #f3c6c6; }
+button.block { display: block; width: 100%; }
+button.small-btn { padding: 7px 14px; font-size: 13px; border-radius: 10px; }
+input, select, textarea { width: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px;
+  background: #ffffff; color: var(--text); font: inherit; outline: none; transition: border 0.2s; }
+input:focus, select:focus, textarea:focus { border-color: var(--orange); }
+label { display: block; margin: 12px 0 6px; color: var(--muted); font-size: 13px; font-weight: 500; }
+.row { display: flex; gap: 10px; }
+.row > * { flex: 1; min-width: 0; }
+.grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; }
+.grid3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
+.stat { background: var(--card2); border-radius: 16px; padding: 14px; border-left: 4px solid var(--orange); }
+.stat b { display: block; font-size: 22px; margin-top: 4px; }
+.stat .cap { display:block; font-size: 11px; color: var(--muted); margin-top: 2px; }
+.progress { height: 8px; background: var(--card2); border-radius: 99px; overflow: hidden; margin: 14px 0 12px; }
+.progress i { display: block; height: 100%; background: linear-gradient(90deg, var(--yellow), var(--orange));
+  border-radius: 99px; transition: width 0.3s; }
+.pill { display: inline-block; padding: 4px 12px; border-radius: 99px; font-size: 12px; font-weight: 600;
+  background: var(--card2); color: var(--muted); }
+.pill.ok { background: #eaf6ea; color: #2e7d32; }
+.pill.bad { background: #fdeaea; color: #c62828; }
+.item { border-top: 1px solid var(--line); padding: 14px 0; }
+.item:first-child { border-top: 0; }
+.itemhead { display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap; }
+.item-actions { display: flex; gap: 6px; }
+.item-actions button { padding: 4px 8px; font-size: 16px; background: transparent; color: var(--muted); border-radius: 8px; }
+.item-actions button:hover { background: var(--card2); color: var(--text); }
+.empty { text-align: center; color: var(--muted); padding: 30px 0; }
+canvas { display: block; width: 100%; height: 200px; background: #ffffff; border-radius: 14px; margin-top: 6px; }
+.tip { padding: 14px; border-radius: 16px; background: #fff6e0; line-height: 1.5; border-left: 4px solid var(--orange); color: #8a5a00; }
+.choice { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin: 8px 0; }
+.choice button { background: var(--card2); color: var(--text); padding: 10px 6px; border-radius: 12px; border: 1px solid var(--line); }
+.choice button.selected { background: linear-gradient(135deg, var(--yellow), var(--orange)); color: #fff; border-color: transparent; }
+.timer-display { font-size: 56px; font-weight: 800; text-align: center; letter-spacing: -2px; padding: 10px 0;
+  color: var(--orange); font-variant-numeric: tabular-nums; }
+.timer-phase { text-align: center; font-size: 18px; font-weight: 600; color: var(--muted); margin-top: -6px; }
+.timer-controls { display: flex; gap: 10px; justify-content: center; margin: 12px 0; }
+.timer-controls button { min-width: 80px; }
+.day-toggle { background: var(--card2); border: 1px solid var(--line); border-radius: 14px; padding: 12px 16px;
+  margin: 4px 0; cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+  font-weight: 700; transition: background 0.2s; }
+.day-toggle:hover { background: #ececec; }
+.day-toggle .arrow { transition: transform 0.3s; color: var(--muted); }
+.day-toggle.open .arrow { transform: rotate(180deg); }
+.day-content { padding: 12px 0 8px; display: none; }
+.day-content.open { display: block; }
+.meal-row { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
+.meal-row input { flex: 1; padding: 6px 10px; font-size: 14px; }
+.meal-row input.meal-cal { flex: 0 0 70px; }
+.meal-row button { padding: 6px 12px; font-size: 13px; background: var(--card2); color: var(--text); border: 1px solid var(--line); }
+.day-total { text-align: right; font-weight: 700; color: var(--orange); margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.day-total .over { color: #c62828; }
+.settings-row { display:flex; align-items:center; gap:10px; margin: 10px 0; }
+.settings-row input[type=checkbox] { width: auto; }
+.footer-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin: 18px 0 4px; }
+@media (max-width: 420px) {
+  .app { padding: 12px; } .card { padding: 16px; } .grid { grid-template-columns: 1fr; }
+  .grid3 { grid-template-columns: 1fr 1fr; } nav button { font-size: 10px; } nav button span { font-size: 20px; }
+  .timer-display { font-size: 40px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<section id="home" class="page active">
+  <div class="card">
+    <div class="muted">Моя цель</div>
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <span id="homeWeight" style="font-size:40px;font-weight:800;color:var(--orange);">— кг</span>
+      <span id="homeChange" class="muted">Добавь измерение</span>
+    </div>
+    <div class="progress"><i id="goalBar" style="width:0%"></i></div>
+    <div class="row">
+      <div><span class="muted">Старт</span><br><b id="homeStart">—</b></div>
+      <div><span class="muted">Цель</span><br><b id="homeTarget">—</b></div>
+      <div><span class="muted">Осталось</span><br><b id="homeLeft">—</b></div>
+    </div>
+    <p class="hint" id="goalHint">Здесь будет твой текущий вес. Чтобы он появился — открой вкладку «Вес» внизу и внеси первое измерение.</p>
+    <div id="reminderBanner" class="tip" style="display:none;"></div>
+  </div>
+
+  <div class="card">
+    <h2>Сегодня</h2>
+    <p class="hint">Короткая сводка за сегодняшний день — заполняется автоматически, когда ты добавляешь тренировку или питание на соответствующих вкладках.</p>
+    <div class="grid">
+      <div class="stat"><span class="muted">Тренировка</span><b id="homeWorkout">—</b><span class="cap">была ли сегодня</span></div>
+      <div class="stat"><span class="muted">Питание</span><b id="homeFood">—</b><span class="cap">по плану / нет</span></div>
+      <div class="stat"><span class="muted">Белок</span><b id="homeProtein">—</b><span class="cap">введено вручную</span></div>
+      <div class="stat"><span class="muted">Ккал</span><b id="homeKcal">—</b><span class="cap">введено вручную</span></div>
+    </div>
+    <div id="todayActions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;"></div>
+  </div>
+
+  <div class="card">
+    <h2>Вес — динамика</h2>
+    <p class="hint">Тут строится график по замерам с вкладки «Вес». Внеси хотя бы 2 замера в разные дни — и линия появится сама.</p>
+    <canvas id="homeChart"></canvas>
+  </div>
+
+  <div class="card">
+    <h2>Напоминания</h2>
+    <p class="hint">Здесь показывается, когда пора взвеситься, сделать замеры или попить воды. Открывай приложение — и увидишь жёлтый баннер выше, если сегодня как раз день напоминания.</p>
+    <div id="reminders"></div>
+    <div class="settings-row">
+      <input type="checkbox" id="waterEnabled" onchange="toggleWater()">
+      <label style="margin:0;" for="waterEnabled">Напоминать пить воду</label>
+    </div>
+    <div id="waterSettings" style="display:none;">
+      <label>Каждые сколько часов напоминать <input id="waterHours" type="number" min="1" max="12" value="2"></label>
+      <div class="row" style="margin-top:8px;">
+        <button class="block" onclick="logWater()">💧 Отметить: попила воду</button>
+      </div>
+      <p class="hint" id="waterInfo"></p>
+    </div>
+    <div class="day-toggle" onclick="togglePushCard()" id="pushToggle" style="margin-top:14px;">
+      <span>🔔 Настоящие уведомления (даже когда приложение закрыто)</span><span class="arrow">▼</span>
+    </div>
+    <div class="day-content" id="pushContent">
+      <p class="hint">Один раз укажи адрес своего сервера напоминаний (получишь его после деплоя на Render — см. инструкцию), потом нажми «Включить push».</p>
+      <label>Адрес сервера <input id="pushServerUrl" type="text" placeholder="https://твой-сервер.onrender.com"></label>
+      <button class="block" onclick="enableNotifications()">🔔 Включить push-уведомления</button>
+      <p class="hint" id="pushStatus"></p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="day-toggle" onclick="toggleSettingsCard()" id="settingsToggle">
+      <span>⚙ Настройки и данные</span><span class="arrow">▼</span>
+    </div>
+    <div class="day-content" id="settingsContent">
+      <p class="hint">Стартовый и целевой вес, дневная норма калорий и белка — используются для расчёта прогресса и плана питания.</p>
+      <label>Стартовый вес, кг <input id="sStart" type="number" step="0.1"></label>
+      <label>Целевой вес, кг <input id="sTarget" type="number" step="0.1"></label>
+      <div class="row">
+        <label>Обычный день, ккал <input id="sNormal" type="number"></label>
+        <label>Тренировочный день, ккал <input id="sTrain" type="number"></label>
+      </div>
+      <label>Белок, г в день <input id="sProtein" type="number"></label>
+      <label>Взвешивание каждые, дней <input id="sWeightDays" type="number" min="1"></label>
+      <label>Параметры каждые, дней <input id="sMeasureDays" type="number" min="1"></label>
+      <button class="block" onclick="saveSettings()">Сохранить настройки</button>
+      <div class="footer-actions">
+        <button class="secondary small-btn" onclick="exportData()">💾 Экспорт</button>
+        <button class="secondary small-btn" onclick="document.getElementById('importFile').click()">📂 Импорт</button>
+        <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+        <button class="danger small-btn" onclick="resetAll()">🗑 Удалить всё</button>
+      </div>
+      <p class="hint" style="text-align:center;">Все данные хранятся только в этом браузере на этом телефоне. Экспорт — чтобы сделать резервную копию файлом.</p>
+    </div>
+  </div>
+</section>
+
+<section id="workouts" class="page">
+  <div class="card">
+    <h2>⏱ Интервальный таймер</h2>
+    <p class="hint">Для интервальных тренировок: задай время работы, отдыха и число кругов, затем жми «Старт». Будет звуковой сигнал на смене фаз.</p>
+    <div class="row">
+      <label>Работа (сек) <input id="timerWork" type="number" value="30" min="1"></label>
+      <label>Отдых (сек) <input id="timerRest" type="number" value="10" min="1"></label>
+      <label>Круги <input id="timerRounds" type="number" value="5" min="1"></label>
+    </div>
+    <div class="timer-display" id="timerDisplay">00:00</div>
+    <div class="timer-phase" id="timerPhase">⏸ Готов к старту</div>
+    <div class="timer-controls">
+      <button id="timerStartBtn" onclick="timerStart()">▶ Старт</button>
+      <button class="secondary" onclick="timerPause()">⏸ Пауза</button>
+      <button class="secondary" onclick="timerReset()">⏹ Сброс</button>
+    </div>
+    <div class="muted" style="text-align:center;margin-top:6px;">
+      Круг <span id="timerCurrentRound">0</span> / <span id="timerTotalRounds">5</span>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Добавить тренировку</h2>
+    <label>Дата <input id="wDate" type="date"></label>
+    <label>Тип <select id="wType">
+      <option>Бег на улице</option>
+      <option>Беговая дорожка</option>
+      <option>Кор-тренировка</option>
+      <option>Силовая тренировка</option>
+      <option>Тренировка с гантелями</option>
+      <option>Кардио</option>
+      <option>Интервальная</option>
+      <option>Другое</option>
+    </select></label>
+    <div class="row">
+      <label>Длительность, мин <input id="wDuration" type="number" min="1" placeholder="напр. 45"></label>
+      <label>Самочувствие <select id="wFeel"><option>Отлично</option><option>Нормально</option><option>Тяжело</option></select></label>
+    </div>
+    <button class="block" onclick="addWorkout()">Сохранить тренировку</button>
+  </div>
+  <div class="card">
+    <h2>Статистика</h2>
+    <div class="grid3">
+      <div class="stat"><span class="muted">7 дней</span><b id="wk7">0</b></div>
+      <div class="stat"><span class="muted">30 дней</span><b id="wk30">0</b></div>
+      <div class="stat"><span class="muted">Серия подряд</span><b id="streak">0</b></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>История тренировок</h2>
+    <p class="hint">Все сохранённые тренировки, новые сверху. Можно отредактировать (✏️) или удалить (🗑️).</p>
+    <div id="workoutList"></div>
+  </div>
+</section>
+
+<section id="food" class="page">
+  <div class="card">
+    <h2>Дневное питание</h2>
+    <label>Дата <input id="fDate" type="date" onchange="updateFoodAutoInfo()"></label>
+    <p class="hint">Отметь, придерживалась ли плана питания на неделю (вкладка ниже) сегодня. Если «По плану» — калории и белок подставятся сами из меню этого дня недели, вносить вручную ничего не нужно.</p>
+    <div class="choice">
+      <button id="foodYes" onclick="setFoodStatus('yes')">По плану</button>
+      <button id="foodChanged" onclick="setFoodStatus('changed')">Изменила</button>
+      <button id="foodOff" onclick="setFoodStatus('off')">Не по плану</button>
+    </div>
+    <div id="fAutoInfo" class="hint" style="display:none;"></div>
+    <label>Заметки (необязательно) <textarea id="fText" rows="2" placeholder="Что было не так, если хочешь запомнить"></textarea></label>
+    <button class="block" onclick="saveFood()">Сохранить день</button>
+  </div>
+  <div class="card">
+    <h2>📅 План питания на неделю</h2>
+    <p class="hint">Полностью пересчитан по реальным продуктам: 3 главных приёма — Завтрак, Обед, Перекус — сделаны равными по калориям, после завтрака добавлен кофе + перекус (орехи/шоколад), Ужин — лёгкий, на остаток калорий. Итого каждый день ≈ 1500 ккал и 107–147 г белка (в среднем 128 г/день).</p>
+    <div id="weekPlan"></div>
+  </div>
+  <div class="card">
+    <h2>История питания</h2>
+    <p class="hint">Сохранённые дни с отметкой «по плану / изменила / не по плану».</p>
+    <div id="foodList"></div>
+  </div>
+</section>
+
+<section id="measure" class="page">
+  <div class="card">
+    <h2>Вес и параметры</h2>
+    <p class="hint">Сюда вноси вес (и, если хочешь, замеры талии/бёдер/живота) — из этих данных строится весь прогресс на Главной.</p>
+    <label>Дата <input id="mDate" type="date"></label>
+    <div class="row">
+      <label>Вес, кг <input id="mWeight" type="number" step="0.1"></label>
+      <label>Талия, см <input id="mWaist" type="number" step="0.5"></label>
+    </div>
+    <div class="row">
+      <label>Живот, см <input id="mBelly" type="number" step="0.5"></label>
+      <label>Бёдра, см <input id="mHips" type="number" step="0.5"></label>
+    </div>
+    <button class="block" onclick="addMeasure()">Сохранить замер</button>
+  </div>
+  <div class="card">
+    <h2>Динамика</h2>
+    <p class="hint">Выбери, какой график показать. Он появится, когда наберётся минимум 2 замера этого показателя.</p>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+      <button class="secondary" onclick="switchMetric('weight')" id="btnWeight">Вес</button>
+      <button class="secondary" onclick="switchMetric('waist')" id="btnWaist">Талия</button>
+      <button class="secondary" onclick="switchMetric('hips')" id="btnHips">Бёдра</button>
+      <button class="secondary" onclick="switchMetric('belly')" id="btnBelly">Живот</button>
+    </div>
+    <canvas id="metricChart"></canvas>
+    <div id="metricInfo" class="muted" style="margin-top:6px;"></div>
+  </div>
+  <div class="card"><h2>Последние параметры</h2><div class="grid3" id="metrics"></div></div>
+  <div class="card">
+    <h2>История замеров</h2>
+    <div id="measureList"></div>
+  </div>
+</section>
+
+</div>
+
+<nav>
+  <button class="active" onclick="showPage('home',this)"><span>⌂</span>Главная</button>
+  <button onclick="showPage('workouts',this)"><span>◷</span>Тренировки</button>
+  <button onclick="showPage('food',this)"><span>○</span>Питание</button>
+  <button onclick="showPage('measure',this)"><span>↕</span>Вес</button>
+</nav>
+
+<script>
+// ============================================================
+// ДАННЫЕ
+// ============================================================
+const KEY = 'myProgressV2';
+
+function generateWeekMenu() {
+  return {
+    monday: { meals: [
+      { name: 'Завтрак: Овсяная каша на молоке с бананом — 50 г овсянки + 195 мл молока 1,5% + 130 г банана', cal: 384, protein: 13.1 },
+      { name: 'Кофе без сахара + 20 г миндаля', cal: 116, protein: 4.2 },
+      { name: 'Обед: Куриная грудка с гречкой и овощным салатом — 100 г куриной грудки отварной/запечённой + 55 г гречки (сухой вес) + 50 г огурцов + 50 г помидоров + 5 г растительного масла', cal: 415, protein: 39.2 },
+      { name: 'Перекус: Бутерброд с курицей и сыром — 75 г цельнозернового хлеба + 65 г куриной грудки отварной/запечённой + 25 г сыра + 15 г листьев салата + 40 г огурцов', cal: 390, protein: 33.7 },
+      { name: 'Ужин: Омлет с помидорами — 2 яйца + 75 г помидоров', cal: 207, protein: 16.9 },
+    ]},
+    tuesday: { meals: [
+      { name: 'Завтрак: Сырники со сметаной — 160 г творога 5% + 1 яйцо + 20 г муки + 30 г сметаны 10%', cal: 386, protein: 37.2 },
+      { name: 'Кофе без сахара + 18 г грецких орехов', cal: 118, protein: 2.7 },
+      { name: 'Обед: Минтай с рисом и овощным салатом — 145 г минтая запечённого + 70 г риса (сухой вес) + 70 г огурцов + 70 г помидоров', cal: 397, protein: 34.9 },
+      { name: 'Перекус: Творог с хлебцами и яйцом — 180 г творога 5% + 60 г огурцов + 25 г хлебцев + 1 яйцо', cal: 397, protein: 41.1 },
+      { name: 'Ужин: Салат с тунцом и яйцом — 90 г тунца консервированного + 1 яйцо + 10 г листьев салата + 65 г помидоров + 65 г огурцов', cal: 213, protein: 31.3 },
+    ]},
+    wednesday: { meals: [
+      { name: 'Завтрак: Яичница с помидорами и хлебом — 3 яйца + 80 г помидоров + 30 г листьев салата + 50 г цельнозернового хлеба', cal: 392, protein: 26.4 },
+      { name: 'Кофе без сахара + 20 г тёмного шоколада 85%', cal: 120, protein: 1.6 },
+      { name: 'Обед: Индейка с булгуром и овощами — 115 г индейки тушёной + 60 г булгура (сухой вес) + 80 г капусты + 40 г моркови', cal: 397, protein: 42.1 },
+      { name: 'Перекус: Салат с курицей и авокадо — 130 г куриной грудки отварной/запечённой + 95 г авокадо + 40 г листьев салата + 95 г помидоров', cal: 390, protein: 43.6 },
+      { name: 'Ужин: Творог с ягодами — 155 г творога 5% + 65 г ягод', cal: 214, protein: 26.9 },
+    ]},
+    thursday: { meals: [
+      { name: 'Завтрак: Творожная запеканка с ягодами — 190 г творога 5% + 1 яйцо + 20 г муки + 45 г ягод', cal: 390, protein: 40.5 },
+      { name: 'Кофе без сахара + 20 г миндаля', cal: 116, protein: 4.2 },
+      { name: 'Обед: Тефтели из говядины с макаронами — 115 г тефтелей из говядины + 45 г макарон тв.сортов (сухой вес) + 25 г томатного соуса', cal: 392, protein: 28.9 },
+      { name: 'Перекус: Хлебцы с тунцом и огурцом — 60 г хлебцев + 155 г тунца консервированного + 125 г огурцов', cal: 385, protein: 45.9 },
+      { name: 'Ужин: Яйцо с овощами — 2 яйца + 130 г огурцов + 130 г помидоров', cal: 213, protein: 16.5 },
+    ]},
+    friday: { meals: [
+      { name: 'Завтрак: Гранола с йогуртом и ягодами — 55 г гранолы + 200 г натурального йогурта + 65 г ягод', cal: 394, protein: 14.6 },
+      { name: 'Кофе без сахара + 18 г грецких орехов', cal: 118, protein: 2.7 },
+      { name: 'Обед: Курица с запечённым картофелем — 145 г куриной грудки отварной/запечённой + 145 г картофеля запечённого + 50 г огурцов + 50 г помидоров', cal: 391, protein: 48.8 },
+      { name: 'Перекус: Лаваш с курицей и овощами — 85 г лаваша + 100 г куриной грудки отварной/запечённой + 35 г листьев салата + 65 г огурцов + 50 г помидоров', cal: 390, protein: 39.2 },
+      { name: 'Ужин: Омлет с грибами — 2 яйца + 60 г шампиньонов', cal: 210, protein: 18.8 },
+    ]},
+    saturday: { meals: [
+      { name: 'Завтрак: Пшённая каша с бананом — 60 г пшена (сухой вес) + 75 мл молока 1,5% + 150 г банана', cal: 393, protein: 10.7 },
+      { name: 'Кофе без сахара + 20 г тёмного шоколада 85%', cal: 120, protein: 1.6 },
+      { name: 'Обед: Индейка с гречкой и тушёной капустой — 110 г индейки тушёной + 60 г гречки (сухой вес) + 115 г капусты', cal: 383, protein: 41.4 },
+      { name: 'Перекус: Салат с яйцом, творогом и овощами — 2 яйца + 130 г творога 5% + 120 г огурцов + 120 г помидоров + 60 г натурального йогурта', cal: 388, protein: 39.7 },
+      { name: 'Ужин: Салат с креветками — 165 г креветок варёных + 40 г листьев салата + 125 г помидоров + 125 г огурцов', cal: 211, protein: 37.2 },
+    ]},
+    sunday: { meals: [
+      { name: 'Завтрак: Блинчики с творогом и ягодами — 45 г муки + 1 яйцо + 70 мл молока 1,5% + 60 г творога 5% + 60 г ягод', cal: 384, protein: 24.9 },
+      { name: 'Кофе без сахара + 20 г миндаля', cal: 116, protein: 4.2 },
+      { name: 'Обед: Куриный суп с лапшой и хлебом — 250 мл куриного супа с лапшой + 35 г цельнозернового хлеба', cal: 388, protein: 28.1 },
+      { name: 'Перекус: Бутерброд с индейкой и сыром — 80 г цельнозернового хлеба + 65 г индейки тушёной + 25 г сыра + 40 г огурцов + 40 г помидоров', cal: 388, protein: 33.0 },
+      { name: 'Ужин: Творог с орехами — 120 г творога 5% + 10 г грецких орехов', cal: 211, protein: 21.9 },
+    ]},
+  };
+}
+
+let defaultSettings = { start: 66, target: 58, normal: 1500, train: 1700, protein: 110, weightDays: 7, measureDays: 28, waterEnabled: false, waterHours: 2, pushEnabled: false, pushServerUrl: '' };
+let defaultData = { workouts: [], food: [], measure: [], settings: defaultSettings, weekMenu: generateWeekMenu(), waterLog: [] };
+
+let db;
+try {
+  const raw = localStorage.getItem(KEY);
+  if (raw) {
+    const parsed = JSON.parse(raw);
+    if (parsed.weekMenu && typeof parsed.weekMenu === 'object' && Object.keys(parsed.weekMenu).length === 7) {
+      db = parsed;
+    } else {
+      db = defaultData;
+    }
+  } else {
+    db = defaultData;
+  }
+  if (!db.settings) db.settings = defaultSettings;
+  if (db.settings.waterEnabled === undefined) db.settings.waterEnabled = false;
+  if (db.settings.waterHours === undefined) db.settings.waterHours = 2;
+  if (db.settings.pushEnabled === undefined) db.settings.pushEnabled = false;
+  if (db.settings.pushServerUrl === undefined) db.settings.pushServerUrl = '';
+  if (!db.waterLog) db.waterLog = [];
+} catch(e) { db = defaultData; }
+
+const days = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+let needRegen = false;
+for (let d of days) {
+  if (!db.weekMenu[d] || !db.weekMenu[d].meals || db.weekMenu[d].meals.length === 0) { needRegen = true; break; }
+}
+if (needRegen) { db.weekMenu = generateWeekMenu(); }
+
+let selectedFood = 'yes';
+let currentMetric = 'weight';
+let notifyInterval = null;
+
+let timer = { work: 30, rest: 10, rounds: 5, currentRound: 0, phase: 'idle', timeLeft: 0, interval: null, isPaused: false, running: false };
+
+const today = () => new Date().toISOString().slice(0,10);
+const save = () => { localStorage.setItem(KEY, JSON.stringify(db)); render(); };
+
+// ============================================================
+// ВСПОМОГАТЕЛЬНЫЕ
+// ============================================================
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]);
+}
+function sorted(arr) { return [...arr].sort((a,b) => b.date.localeCompare(a.date)); }
+function getDateInput(id) { return document.getElementById(id).value || today(); }
+
+// ============================================================
+// НАВИГАЦИЯ
+// ============================================================
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  else {
+    const map = {home:0, workouts:1, food:2, measure:3};
+    document.querySelectorAll('nav button')[map[id]||0].classList.add('active');
+  }
+  render();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// ============================================================
+// ВАЛИДАЦИЯ
+// ============================================================
+function validateNumber(val, field) {
+  if (val === '' || isNaN(val) || val < 0) {
+    alert(`Введите положительное число в поле "${field}"`);
+    return false;
+  }
+  return true;
+}
+
+// ============================================================
+// ТРЕНИРОВКИ
+// ============================================================
+function addWorkout() {
+  const date = getDateInput('wDate');
+  const type = document.getElementById('wType').value;
+  const duration = document.getElementById('wDuration').value;
+  const feel = document.getElementById('wFeel').value;
+  if (!duration) { alert('Укажите длительность в минутах'); return; }
+  db.workouts.push({ date, type, duration, feel });
+  document.getElementById('wDuration').value = '';
+  save();
+  alert('✅ Тренировка добавлена');
+}
+function deleteWorkout(i) { if (confirm('Удалить?')) { db.workouts.splice(i,1); save(); } }
+function editWorkout(i) {
+  const w = db.workouts[i];
+  document.getElementById('wDate').value = w.date;
+  document.getElementById('wType').value = w.type;
+  document.getElementById('wDuration').value = w.duration;
+  document.getElementById('wFeel').value = w.feel || 'Нормально';
+  db.workouts.splice(i,1);
+  save();
+  showPage('workouts');
+}
+
+// ============================================================
+// ТАЙМЕР
+// ============================================================
+function timerStart() {
+  const work = parseInt(document.getElementById('timerWork').value) || 30;
+  const rest = parseInt(document.getElementById('timerRest').value) || 10;
+  const rounds = parseInt(document.getElementById('timerRounds').value) || 5;
+  timer.work = work; timer.rest = rest; timer.rounds = rounds;
+  document.getElementById('timerTotalRounds').textContent = rounds;
+
+  if (timer.running && !timer.isPaused) return;
+
+  if (timer.isPaused) {
+    timer.isPaused = false; timer.running = true;
+    document.getElementById('timerStartBtn').textContent = '▶ Старт';
+    clearInterval(timer.interval);
+    timer.interval = setInterval(tick, 1000);
+    return;
+  }
+
+  timer.currentRound = 1;
+  timer.phase = 'work';
+  timer.timeLeft = timer.work;
+  timer.running = true;
+  timer.isPaused = false;
+  document.getElementById('timerStartBtn').textContent = '▶ Старт';
+  clearInterval(timer.interval);
+  timer.interval = setInterval(tick, 1000);
+  updateTimerDisplay();
+}
+function timerPause() {
+  if (!timer.running) return;
+  timer.isPaused = true;
+  clearInterval(timer.interval);
+  document.getElementById('timerStartBtn').textContent = '▶ Продолжить';
+}
+function timerReset() {
+  clearInterval(timer.interval);
+  timer.running = false; timer.isPaused = false; timer.currentRound = 0; timer.phase = 'idle'; timer.timeLeft = 0;
+  document.getElementById('timerStartBtn').textContent = '▶ Старт';
+  updateTimerDisplay();
+  document.getElementById('timerPhase').textContent = '⏸ Готов к старту';
+  document.getElementById('timerCurrentRound').textContent = '0';
+}
+function tick() {
+  if (timer.timeLeft <= 0) {
+    playBeep();
+    if (timer.phase === 'work') {
+      if (timer.currentRound >= timer.rounds) {
+        timerReset();
+        document.getElementById('timerPhase').textContent = '🏁 Тренировка завершена!';
+        return;
+      }
+      timer.phase = 'rest';
+      timer.timeLeft = timer.rest;
+      document.getElementById('timerPhase').textContent = `🧘 Отдых ${timer.currentRound}/${timer.rounds}`;
+    } else {
+      timer.currentRound++;
+      timer.phase = 'work';
+      timer.timeLeft = timer.work;
+      document.getElementById('timerPhase').textContent = `💪 Работа ${timer.currentRound}/${timer.rounds}`;
+      document.getElementById('timerCurrentRound').textContent = timer.currentRound;
+    }
+    updateTimerDisplay();
+    return;
+  }
+  timer.timeLeft--;
+  updateTimerDisplay();
+}
+function updateTimerDisplay() {
+  const mins = Math.floor(timer.timeLeft / 60);
+  const secs = timer.timeLeft % 60;
+  document.getElementById('timerDisplay').textContent = String(mins).padStart(2,'0')+':'+String(secs).padStart(2,'0');
+  if (timer.phase !== 'idle') {
+    document.getElementById('timerCurrentRound').textContent = timer.currentRound;
+  }
+}
+function playBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = 880; osc.type = 'square'; gain.gain.value = 0.3;
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.15);
+  } catch(e) {}
+}
+
+// ============================================================
+// ПИТАНИЕ
+// ============================================================
+function setFoodStatus(s) {
+  selectedFood = s;
+  ['Yes','Changed','Off'].forEach(x => document.getElementById('food'+x).classList.remove('selected'));
+  document.getElementById('food'+({yes:'Yes', changed:'Changed', off:'Off'}[s])).classList.add('selected');
+  updateFoodAutoInfo();
+}
+// Возвращает ключ дня недели (monday..sunday) для строки даты YYYY-MM-DD
+function weekdayKeyFromDate(dateStr) {
+  const keys = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+  const d = new Date(dateStr + 'T00:00:00');
+  return keys[d.getDay()];
+}
+// Считает итоговые ккал/белок за день по плану питания
+function planTotalsForDate(dateStr) {
+  const key = weekdayKeyFromDate(dateStr);
+  const day = db.weekMenu[key];
+  if (!day) return { kcal: 0, protein: 0 };
+  const kcal = day.meals.reduce((s,m) => s + (m.cal||0), 0);
+  const protein = day.meals.reduce((s,m) => s + (m.protein||0), 0);
+  return { kcal: Math.round(kcal), protein: Math.round(protein*10)/10 };
+}
+function updateFoodAutoInfo() {
+  const date = getDateInput('fDate');
+  const info = document.getElementById('fAutoInfo');
+  if (selectedFood === 'yes') {
+    const t = planTotalsForDate(date);
+    info.style.display = 'block';
+    info.textContent = `По плану этого дня: ${t.kcal} ккал, ${t.protein} г белка — подставится автоматически.`;
+  } else {
+    info.style.display = 'none';
+  }
+}
+function saveFood() {
+  const date = getDateInput('fDate');
+  const text = document.getElementById('fText').value.trim();
+  let protein = null, kcal = null;
+  if (selectedFood === 'yes') {
+    const t = planTotalsForDate(date);
+    kcal = t.kcal; protein = t.protein;
+  }
+  let idx = db.food.findIndex(x => x.date === date);
+  const item = { date, status: selectedFood, text, protein, kcal };
+  if (idx>=0) db.food[idx]=item; else db.food.push(item);
+  document.getElementById('fText').value = '';
+  save();
+  alert('✅ Сохранено');
+}
+function deleteFood(i) { if (confirm('Удалить?')) { db.food.splice(i,1); save(); } }
+function editFood(i) {
+  const f = db.food[i];
+  document.getElementById('fDate').value = f.date;
+  document.getElementById('fText').value = f.text || '';
+  setFoodStatus(f.status);
+  db.food.splice(i,1);
+  save();
+  showPage('food');
+}
+
+// ============================================================
+// НЕДЕЛЬНОЕ МЕНЮ
+// ============================================================
+function renderWeekMenu() {
+  const container = document.getElementById('weekPlan');
+  const days = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+  const dayNames = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+  let html = '';
+  days.forEach((key, idx) => {
+    const day = db.weekMenu[key];
+    const total = day.meals.reduce((sum, m) => sum + (m.cal || 0), 0);
+    const totalProtein = Math.round(day.meals.reduce((sum, m) => sum + (m.protein || 0), 0)*10)/10;
+    const over = total > db.settings.normal * 1.05;
+    html += `
+      <div class="day-toggle" onclick="toggleDay('${key}')">
+        <span>${dayNames[idx]} <span class="muted">(${total} ккал · ${totalProtein} г белка)</span></span>
+        <span class="arrow">▼</span>
+      </div>
+      <div class="day-content" id="day-${key}">
+        ${day.meals.map((meal, mi) => `
+          <div class="meal-row">
+            <input type="text" class="meal-name" value="${esc(meal.name)}" data-day="${key}" data-idx="${mi}" placeholder="Название">
+            <input type="number" class="meal-cal" value="${meal.cal}" data-day="${key}" data-idx="${mi}" placeholder="ккал">
+            <span class="muted small" style="white-space:nowrap;">${meal.protein!=null? meal.protein+' г б.':''}</span>
+            <button onclick="removeMeal('${key}', ${mi})">✕</button>
+          </div>
+        `).join('')}
+        <button class="secondary" onclick="addMeal('${key}')" style="font-size:13px;padding:6px 12px;">+ Добавить приём</button>
+        <div class="day-total ${over?'over':''}">Итого: ${total} ккал · ${totalProtein} г белка ${over?'⚠️ заметно выше нормы':''}</div>
+      </div>
+    `;
+  });
+  container.innerHTML = html;
+
+  document.querySelectorAll('.meal-name, .meal-cal').forEach(el => {
+    el.addEventListener('change', function() {
+      const day = this.dataset.day;
+      const idx = parseInt(this.dataset.idx);
+      const meals = db.weekMenu[day].meals;
+      if (this.classList.contains('meal-name')) { meals[idx].name = this.value; }
+      else { meals[idx].cal = parseFloat(this.value) || 0; }
+      save();
+      renderWeekMenu();
+    });
+  });
+}
+function toggleDay(key) {
+  const content = document.getElementById('day-'+key);
+  const toggle = content.previousElementSibling;
+  content.classList.toggle('open');
+  toggle.classList.toggle('open');
+}
+function addMeal(key) {
+  db.weekMenu[key].meals.push({ name: 'Новый приём', cal: 100 });
+  save();
+  renderWeekMenu();
+}
+function removeMeal(key, idx) {
+  if (db.weekMenu[key].meals.length <= 1) { alert('Должен быть хотя бы один приём'); return; }
+  db.weekMenu[key].meals.splice(idx, 1);
+  save();
+  renderWeekMenu();
+}
+
+// ============================================================
+// ЗАМЕРЫ
+// ============================================================
+function addMeasure() {
+  const date = getDateInput('mDate');
+  const weight = parseFloat(document.getElementById('mWeight').value) || null;
+  const waist = parseFloat(document.getElementById('mWaist').value) || null;
+  const belly = parseFloat(document.getElementById('mBelly').value) || null;
+  const hips = parseFloat(document.getElementById('mHips').value) || null;
+  if (weight && !validateNumber(weight, 'Вес')) return;
+  db.measure.push({ date, weight, waist, belly, hips });
+  document.getElementById('mWeight').value = '';
+  document.getElementById('mWaist').value = '';
+  document.getElementById('mBelly').value = '';
+  document.getElementById('mHips').value = '';
+  save();
+  syncSettingsToServer();
+  alert('✅ Замер сохранён');
+}
+function deleteMeasure(i) { if (confirm('Удалить?')) { db.measure.splice(i,1); save(); } }
+function editMeasure(i) {
+  const m = db.measure[i];
+  document.getElementById('mDate').value = m.date;
+  document.getElementById('mWeight').value = m.weight || '';
+  document.getElementById('mWaist').value = m.waist || '';
+  document.getElementById('mBelly').value = m.belly || '';
+  document.getElementById('mHips').value = m.hips || '';
+  db.measure.splice(i,1);
+  save();
+  showPage('measure');
+}
+
+// ============================================================
+// НАСТРОЙКИ / ДАННЫЕ
+// ============================================================
+function toggleSettingsCard() {
+  document.getElementById('settingsContent').classList.toggle('open');
+  document.getElementById('settingsToggle').classList.toggle('open');
+}
+function saveSettings() {
+  const start = parseFloat(document.getElementById('sStart').value);
+  const target = parseFloat(document.getElementById('sTarget').value);
+  const normal = parseInt(document.getElementById('sNormal').value);
+  const train = parseInt(document.getElementById('sTrain').value);
+  const protein = parseInt(document.getElementById('sProtein').value);
+  const weightDays = parseInt(document.getElementById('sWeightDays').value);
+  const measureDays = parseInt(document.getElementById('sMeasureDays').value);
+  if (!validateNumber(start, 'Стартовый вес')) return;
+  if (!validateNumber(target, 'Целевой вес')) return;
+  db.settings.start = start; db.settings.target = target; db.settings.normal = normal;
+  db.settings.train = train; db.settings.protein = protein;
+  db.settings.weightDays = weightDays; db.settings.measureDays = measureDays;
+  save();
+  syncSettingsToServer();
+  alert('✅ Сохранено');
+}
+function exportData() {
+  const b = new Blob([JSON.stringify(db, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(b);
+  a.download = 'мой-прогресс.json';
+  a.click();
+}
+function importData(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (data.workouts && data.food && data.measure && data.settings && data.weekMenu) {
+        db = data;
+        if (!db.waterLog) db.waterLog = [];
+        if (db.settings.waterEnabled === undefined) db.settings.waterEnabled = false;
+        if (db.settings.waterHours === undefined) db.settings.waterHours = 2;
+        save(); alert('✅ Импорт выполнен');
+      } else alert('❌ Неверный формат');
+    } catch(err) { alert('❌ Ошибка чтения'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+function resetAll() {
+  if (confirm('Удалить все данные?')) { localStorage.removeItem(KEY); location.reload(); }
+}
+
+// ============================================================
+// ВОДА
+// ============================================================
+function toggleWater() {
+  db.settings.waterEnabled = document.getElementById('waterEnabled').checked;
+  save();
+}
+function logWater() {
+  db.waterLog.push(new Date().toISOString());
+  db.settings.waterHours = parseInt(document.getElementById('waterHours').value) || 2;
+  save();
+  syncSettingsToServer();
+}
+function nextWaterTime() {
+  const hours = db.settings.waterHours || 2;
+  const last = db.waterLog.length ? new Date(db.waterLog[db.waterLog.length-1]) : new Date(0);
+  return new Date(last.getTime() + hours*3600000);
+}
+function checkWaterDue() {
+  if (!db.settings.waterEnabled) return false;
+  return new Date() >= nextWaterTime();
+}
+// ============================================================
+// НАСТОЯЩИЕ PUSH-УВЕДОМЛЕНИЯ (через собственный сервер)
+// ============================================================
+const VAPID_PUBLIC_KEY = 'BNK_jC02ggcgcZ8eo85Y4AqbRBLkH5xdcinQO-zkzrXCEbybMvBh-dnXY0GVVLEI5htpNdof3DohMWFWi57TEg0';
+
+function togglePushCard() {
+  document.getElementById('pushContent').classList.toggle('open');
+  document.getElementById('pushToggle').classList.toggle('open');
+}
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+function getServerUrl() {
+  return (document.getElementById('pushServerUrl').value || '').trim().replace(/\/$/, '');
+}
+async function enableNotifications() {
+  const serverUrl = getServerUrl();
+  if (!serverUrl) { alert('Сначала укажи адрес сервера'); return; }
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    alert('Этот браузер не поддерживает push-уведомления'); return;
+  }
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { alert('Уведомления не разрешены в браузере'); return; }
+    const reg = await navigator.serviceWorker.register('sw.js');
+    await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+    await fetch(serverUrl + '/api/subscribe', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ subscription: sub })
+    });
+    db.settings.pushServerUrl = serverUrl;
+    db.settings.pushEnabled = true;
+    save();
+    await syncSettingsToServer();
+    document.getElementById('pushStatus').textContent = '✅ Готово! Push-уведомления включены.';
+  } catch (e) {
+    console.error(e);
+    document.getElementById('pushStatus').textContent = '❌ Не получилось: ' + e.message;
+  }
+}
+async function syncSettingsToServer() {
+  if (!db.settings.pushEnabled || !db.settings.pushServerUrl) return;
+  try {
+    await fetch(db.settings.pushServerUrl + '/api/settings', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        waterHours: db.settings.waterHours,
+        lastWaterLog: db.waterLog.length ? db.waterLog[db.waterLog.length-1] : null,
+        weightDays: db.settings.weightDays,
+        measureDays: db.settings.measureDays,
+        lastWeightLog: sorted(db.measure.filter(x=>x.weight))[0]?.date || null,
+        lastMeasureLog: sorted(db.measure)[0]?.date || null
+      })
+    });
+  } catch(e) { console.error('Sync error', e); }
+}
+
+// ============================================================
+// ГРАФИКИ
+// ============================================================
+function drawChart(id, data, label, unit) {
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = devicePixelRatio || 1;
+  const w = canvas.clientWidth || 300;
+  const h = 200;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, w, h);
+
+  const values = data.map(x => x.value).filter(v => v != null);
+  if (values.length < 2) {
+    ctx.fillStyle = '#9ca3af';
+    ctx.font = '14px system-ui';
+    ctx.fillText('Пока недостаточно данных — добавь ещё один замер', 14, 105);
+    return;
+  }
+  const mn = Math.min(...values) - 0.5;
+  const mx = Math.max(...values) + 0.5;
+  const range = mx - mn || 1;
+
+  ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 1;
+  for (let i=0; i<4; i++) {
+    const y = 20 + i*55;
+    ctx.beginPath(); ctx.moveTo(10, y); ctx.lineTo(w-10, y); ctx.stroke();
+  }
+
+  ctx.strokeStyle = '#ff6b00'; ctx.lineWidth = 3;
+  ctx.beginPath();
+  data.forEach((d, i) => {
+    if (d.value == null) return;
+    const px = 15 + i * (w-30) / (data.length-1);
+    const py = 195 - (d.value - mn) / range * 165;
+    if (i===0 || data[i-1].value == null) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  });
+  ctx.stroke();
+
+  ctx.fillStyle = '#1a1a1a';
+  data.forEach((d, i) => {
+    if (d.value == null) return;
+    const px = 15 + i * (w-30) / (data.length-1);
+    const py = 195 - (d.value - mn) / range * 165;
+    ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI*2); ctx.fill();
+  });
+
+  ctx.fillStyle = '#6b7280'; ctx.font = '12px system-ui';
+  ctx.fillText(`${label}, ${unit}`, 12, 18);
+}
+function switchMetric(metric) {
+  currentMetric = metric;
+  ['weight','waist','hips','belly'].forEach(m => {
+    const btn = document.getElementById('btn'+m.charAt(0).toUpperCase()+m.slice(1));
+    if (btn) btn.classList.toggle('secondary', m!==metric);
+  });
+  renderMetricChart();
+}
+function renderMetricChart() {
+  const sortedMeasures = sorted(db.measure);
+  const data = sortedMeasures.map(m => ({ value: m[currentMetric] }));
+  const labels = { weight:'Вес', waist:'Талия', hips:'Бёдра', belly:'Живот' };
+  const units = { weight:'кг', waist:'см', hips:'см', belly:'см' };
+  drawChart('metricChart', data, labels[currentMetric], units[currentMetric]);
+
+  const last = sortedMeasures.find(m => m[currentMetric] != null);
+  const first = sortedMeasures.slice().reverse().find(m => m[currentMetric] != null);
+  if (last && first && last !== first) {
+    const diff = last[currentMetric] - first[currentMetric];
+    document.getElementById('metricInfo').textContent =
+      `От ${first[currentMetric].toFixed(1)} до ${last[currentMetric].toFixed(1)} ${units[currentMetric]} · изменение ${diff>0?'+':''}${diff.toFixed(1)} ${units[currentMetric]}`;
+  } else {
+    document.getElementById('metricInfo').textContent = '';
+  }
+}
+
+// ============================================================
+// НАПОМИНАНИЯ
+// ============================================================
+function nextReminder(k) {
+  const arr = db.measure.filter(x => k==='weight' ? x.weight : (x.waist || x.hips || x.belly));
+  const last = arr.length ? new Date(arr[0].date) : new Date();
+  const daysN = k==='weight' ? db.settings.weightDays : db.settings.measureDays;
+  const next = new Date(last);
+  next.setDate(next.getDate() + daysN);
+  return next.toLocaleDateString('ru-RU');
+}
+function checkReminders() {
+  const banner = document.getElementById('reminderBanner');
+  const todayStr = today();
+  const nextWeight = nextReminder('weight');
+  const nextMeasure = nextReminder('measure');
+  let msg = '';
+  if (nextWeight === todayStr) msg += '📢 Сегодня взвешивание! ';
+  if (nextMeasure === todayStr) msg += '📏 Сегодня замеры! ';
+  if (checkWaterDue()) msg += '💧 Пора попить воды!';
+  if (msg) { banner.style.display = 'block'; banner.textContent = msg; }
+  else banner.style.display = 'none';
+}
+
+// ============================================================
+// ОСНОВНОЙ RENDER
+// ============================================================
+function render() {
+  const ms = sorted(db.measure).filter(x => x.weight);
+  const last = ms[0] || null;
+  const first = ms.length ? ms[ms.length-1] : null;
+  const change = (last && first) ? last.weight - first.weight : null;
+
+  document.getElementById('homeWeight').textContent = last ? last.weight.toFixed(1)+' кг' : '— кг';
+  document.getElementById('goalHint').style.display = last ? 'none' : 'block';
+  document.getElementById('homeStart').textContent = db.settings.start+' кг';
+  document.getElementById('homeTarget').textContent = db.settings.target+' кг';
+
+  const losingWeight = db.settings.target <= db.settings.start;
+  const currentWeight = last ? last.weight : db.settings.start;
+  const leftKg = losingWeight
+    ? Math.max(0, currentWeight - db.settings.target)
+    : Math.max(0, db.settings.target - currentWeight);
+  document.getElementById('homeLeft').textContent = last ? leftKg.toFixed(1)+' кг' : '—';
+
+  document.getElementById('homeChange').textContent = change === null
+    ? 'Добавь измерение'
+    : (change<=0 ? '↓ ' : '↑ ') + Math.abs(change).toFixed(1)+' кг от старта';
+
+  const totalDist = Math.max(0.1, Math.abs(db.settings.start - db.settings.target));
+  const doneDist = losingWeight
+    ? (db.settings.start - currentWeight)
+    : (currentWeight - db.settings.start);
+  document.getElementById('goalBar').style.width = Math.max(0, Math.min(100, doneDist/totalDist*100)) + '%';
+
+  const t = today();
+  const tw = db.workouts.filter(x => x.date === t);
+  const tf = db.food.find(x => x.date === t);
+  document.getElementById('homeWorkout').textContent = tw.length ? '✓ '+tw.length : '—';
+  document.getElementById('homeFood').textContent = tf ? ({yes:'✓', changed:'↗', off:'—'}[tf.status]) : '—';
+  document.getElementById('homeProtein').textContent = tf?.protein ? tf.protein+' г' : '—';
+  document.getElementById('homeKcal').textContent = tf?.kcal ? tf.kcal : '—';
+
+  const actions = document.getElementById('todayActions');
+  actions.innerHTML = '';
+  if (!tw.length) actions.innerHTML += `<button onclick="showPage('workouts',document.querySelectorAll('nav button')[1])">+ Тренировка</button>`;
+  if (!tf) actions.innerHTML += `<button onclick="showPage('food',document.querySelectorAll('nav button')[2])">+ Питание</button>`;
+  if (!last || last.date !== t) actions.innerHTML += `<button onclick="showPage('measure',document.querySelectorAll('nav button')[3])">+ Вес</button>`;
+
+  const weightData = ms.slice().reverse().map(m => ({ value: m.weight }));
+  drawChart('homeChart', weightData, 'Вес', 'кг');
+
+  document.getElementById('wk7').textContent = db.workouts.filter(x => new Date(x.date) >= new Date(Date.now()-6*864e5)).length;
+  document.getElementById('wk30').textContent = db.workouts.filter(x => new Date(x.date) >= new Date(Date.now()-29*864e5)).length;
+  document.getElementById('streak').textContent = calcStreak();
+
+  const wl = document.getElementById('workoutList');
+  if (db.workouts.length) {
+    wl.innerHTML = sorted(db.workouts).map((x, idx) => `
+      <div class="item">
+        <div class="itemhead"><b>${esc(x.type)}</b><span class="pill">${x.date}</span></div>
+        <div class="muted">${x.duration?x.duration+' мин':''} · ${esc(x.feel)}</div>
+        <div class="item-actions">
+          <button onclick="editWorkout(${idx})">✏️</button>
+          <button onclick="deleteWorkout(${idx})">🗑️</button>
+        </div>
+      </div>
+    `).join('');
+  } else {
+    wl.innerHTML = '<div class="empty">Нет тренировок</div>';
+  }
+
+  const foodMap = {yes:'По плану', changed:'Изменения', off:'Не по плану'};
+  const foodPill = {yes:'ok', changed:'', off:'bad'};
+  const fl = document.getElementById('foodList');
+  if (db.food.length) {
+    fl.innerHTML = sorted(db.food).map((x, idx) => `
+      <div class="item">
+        <div class="itemhead"><b>${x.date}</b><span class="pill ${foodPill[x.status]}">${foodMap[x.status]}</span></div>
+        <div>${esc(x.text||'')}</div>
+        <div class="muted">${x.protein?x.protein+' г белка':''} ${x.protein&&x.kcal?'·':''} ${x.kcal?x.kcal+' ккал':''}</div>
+        <div class="item-actions">
+          <button onclick="editFood(${idx})">✏️</button>
+          <button onclick="deleteFood(${idx})">🗑️</button>
+        </div>
+      </div>
+    `).join('');
+  } else {
+    fl.innerHTML = '<div class="empty">Нет записей</div>';
+  }
+
+  const ml = document.getElementById('measureList');
+  if (db.measure.length) {
+    ml.innerHTML = sorted(db.measure).map((x, idx) => `
+      <div class="item">
+        <div class="itemhead"><b>${x.date}</b><span class="pill">${x.weight ? x.weight+' кг' : ''}</span></div>
+        <div class="muted">${x.waist?'Талия '+x.waist+' см':''} ${x.hips?'Бёдра '+x.hips+' см':''} ${x.belly?'Живот '+x.belly+' см':''}</div>
+        <div class="item-actions">
+          <button onclick="editMeasure(${idx})">✏️</button>
+          <button onclick="deleteMeasure(${idx})">🗑️</button>
+        </div>
+      </div>
+    `).join('');
+  } else {
+    ml.innerHTML = '<div class="empty">Нет замеров</div>';
+  }
+
+  const lastAll = db.measure.length ? db.measure[0] : null;
+  document.getElementById('metrics').innerHTML = `
+    <div class="stat metric"><span class="muted">Вес</span><b>${lastAll?.weight||'—'}</b><span class="small">${lastAll?.weight?' кг':''}</span></div>
+    <div class="stat metric"><span class="muted">Талия</span><b>${lastAll?.waist||'—'}</b><span class="small">${lastAll?.waist?' см':''}</span></div>
+    <div class="stat metric"><span class="muted">Бёдра</span><b>${lastAll?.hips||'—'}</b><span class="small">${lastAll?.hips?' см':''}</span></div>
+    <div class="stat metric"><span class="muted">Живот</span><b>${lastAll?.belly||'—'}</b><span class="small">${lastAll?.belly?' см':''}</span></div>
+  `;
+
+  let remHtml = `
+    <div class="item">⚖️ Взвешивание: <b>${nextReminder('weight')}</b></div>
+    <div class="item">📏 Параметры: <b>${nextReminder('measure')}</b></div>
+  `;
+  document.getElementById('reminders').innerHTML = remHtml;
+  checkReminders();
+
+  document.getElementById('waterEnabled').checked = !!db.settings.waterEnabled;
+  document.getElementById('waterSettings').style.display = db.settings.waterEnabled ? 'block' : 'none';
+  document.getElementById('waterHours').value = db.settings.waterHours || 2;
+  if (db.settings.pushServerUrl) document.getElementById('pushServerUrl').value = db.settings.pushServerUrl;
+  if (db.settings.pushEnabled) document.getElementById('pushStatus').textContent = '✅ Push-уведомления включены на этом сервере.';
+  if (db.settings.waterEnabled) {
+    const nt = nextWaterTime();
+    document.getElementById('waterInfo').textContent = 'Следующее напоминание примерно в ' +
+      nt.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}) +
+      (db.waterLog.length ? '' : ' (отсчёт начнётся после первой отметки)');
+  }
+
+  document.getElementById('sStart').value = db.settings.start;
+  document.getElementById('sTarget').value = db.settings.target;
+  document.getElementById('sNormal').value = db.settings.normal;
+  document.getElementById('sTrain').value = db.settings.train;
+  document.getElementById('sProtein').value = db.settings.protein;
+  document.getElementById('sWeightDays').value = db.settings.weightDays;
+  document.getElementById('sMeasureDays').value = db.settings.measureDays;
+
+  renderMetricChart();
+  renderWeekMenu();
+
+  document.getElementById('wDate').value = t;
+  document.getElementById('fDate').value = t;
+  document.getElementById('mDate').value = t;
+  if (tf) setFoodStatus(tf.status);
+  updateFoodAutoInfo();
+}
+
+function calcStreak() {
+  const days = new Set(db.workouts.map(x => x.date));
+  let d = new Date(), n = 0;
+  while (days.has(d.toISOString().slice(0,10))) { n++; d.setDate(d.getDate()-1); }
+  return n;
+}
+
+// ============================================================
+// ИНИЦИАЛИЗАЦИЯ
+// ============================================================
+document.getElementById('foodYes').classList.add('selected');
+render();
+</script>
+</body>
+</html>
