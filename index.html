@@ -89,10 +89,12 @@ canvas { display: block; width: 100%; height: 200px; background: #ffffff; border
 .day-toggle.open .arrow { transform: rotate(180deg); }
 .day-content { padding: 12px 0 8px; display: none; }
 .day-content.open { display: block; }
-.meal-row { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
-.meal-row input { flex: 1; padding: 6px 10px; font-size: 14px; }
-.meal-row input.meal-cal { flex: 0 0 70px; }
-.meal-row button { padding: 6px 12px; font-size: 13px; background: var(--card2); color: var(--text); border: 1px solid var(--line); }
+.meal-row { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.meal-row textarea.meal-name { width: 100%; padding: 8px 10px; font-size: 13.5px; line-height: 1.4; resize: vertical; min-height: 44px; font-family: var(--font); }
+.meal-row-sub { display: flex; gap: 8px; align-items: center; }
+.meal-row-sub input.meal-cal { flex: 0 0 70px; padding: 6px 10px; font-size: 14px; }
+.meal-row-sub span { flex: 1; }
+.meal-row-sub button { padding: 6px 12px; font-size: 13px; background: var(--card2); color: var(--text); border: 1px solid var(--line); }
 .day-total { text-align: right; font-weight: 700; color: var(--orange); margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
 .day-total .over { color: #c62828; }
 .settings-row { display:flex; align-items:center; gap:10px; margin: 10px 0; }
@@ -157,6 +159,26 @@ canvas { display: block; width: 100%; height: 200px; background: #ffffff; border
         <button class="block" onclick="logWater()">💧 Отметить: попила воду</button>
       </div>
       <p class="hint" id="waterInfo"></p>
+    </div>
+    <div class="day-toggle" onclick="toggleCustomList()" id="customListToggle" style="margin-top:10px;">
+      <span>💊 Другие напоминания (таблетки и т.п.)</span><span class="arrow">▼</span>
+    </div>
+    <div class="day-content" id="customListContent">
+      <div id="customRemindersList"></div>
+      <div class="row" style="margin-top:8px;">
+        <label style="flex:2;">Название <input id="crName" type="text" placeholder="Например: Выпить таблетку"></label>
+      </div>
+      <div class="row">
+        <label style="flex:1;">Тип
+          <select id="crType" onchange="updateReminderTypeUI()">
+            <option value="daily">Каждый день в это время</option>
+            <option value="interval">Через промежуток часов</option>
+          </select>
+        </label>
+      </div>
+      <div id="crDailyFields"><label>Время <input id="crTime" type="time" value="09:00"></label></div>
+      <div id="crIntervalFields" style="display:none;"><label>Каждые сколько часов <input id="crHours" type="number" min="1" max="24" value="8"></label></div>
+      <button class="block" onclick="addCustomReminder()">+ Добавить напоминание</button>
     </div>
     <div class="day-toggle" onclick="togglePushCard()" id="pushToggle" style="margin-top:14px;">
       <span>🔔 Настоящие уведомления (даже когда приложение закрыто)</span><span class="arrow">▼</span>
@@ -401,6 +423,7 @@ try {
   if (db.settings.pushEnabled === undefined) db.settings.pushEnabled = false;
   if (db.settings.pushServerUrl === undefined) db.settings.pushServerUrl = '';
   if (!db.waterLog) db.waterLog = [];
+  if (!db.customReminders) db.customReminders = [];
 } catch(e) { db = defaultData; }
 
 const days = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
@@ -651,10 +674,12 @@ function renderWeekMenu() {
       <div class="day-content" id="day-${key}">
         ${day.meals.map((meal, mi) => `
           <div class="meal-row">
-            <input type="text" class="meal-name" value="${esc(meal.name)}" data-day="${key}" data-idx="${mi}" placeholder="Название">
-            <input type="number" class="meal-cal" value="${meal.cal}" data-day="${key}" data-idx="${mi}" placeholder="ккал">
-            <span class="muted small" style="white-space:nowrap;">${meal.protein!=null? meal.protein+' г б.':''}</span>
-            <button onclick="removeMeal('${key}', ${mi})">✕</button>
+            <textarea class="meal-name" data-day="${key}" data-idx="${mi}" placeholder="Название" rows="2">${esc(meal.name)}</textarea>
+            <div class="meal-row-sub">
+              <input type="number" class="meal-cal" value="${meal.cal}" data-day="${key}" data-idx="${mi}" placeholder="ккал">
+              <span class="muted small" style="white-space:nowrap;">${meal.protein!=null? meal.protein+' г белка':''}</span>
+              <button onclick="removeMeal('${key}', ${mi})">✕</button>
+            </div>
           </div>
         `).join('')}
         <button class="secondary" onclick="addMeal('${key}')" style="font-size:13px;padding:6px 12px;">+ Добавить приём</button>
@@ -767,6 +792,7 @@ function importData(e) {
       if (data.workouts && data.food && data.measure && data.settings && data.weekMenu) {
         db = data;
         if (!db.waterLog) db.waterLog = [];
+        if (!db.customReminders) db.customReminders = [];
         if (db.settings.waterEnabled === undefined) db.settings.waterEnabled = false;
         if (db.settings.waterHours === undefined) db.settings.waterHours = 2;
         save(); alert('✅ Импорт выполнен');
@@ -863,7 +889,8 @@ async function syncSettingsToServer() {
         weightDays: db.settings.weightDays,
         measureDays: db.settings.measureDays,
         lastWeightLog: sorted(db.measure.filter(x=>x.weight))[0]?.date || null,
-        lastMeasureLog: sorted(db.measure)[0]?.date || null
+        lastMeasureLog: sorted(db.measure)[0]?.date || null,
+        customReminders: db.customReminders || []
       })
     });
   } catch(e) { console.error('Sync error', e); }
@@ -966,9 +993,91 @@ function checkReminders() {
   let msg = '';
   if (nextWeight === todayStr) msg += '📢 Сегодня взвешивание! ';
   if (nextMeasure === todayStr) msg += '📏 Сегодня замеры! ';
-  if (checkWaterDue()) msg += '💧 Пора попить воды!';
-  if (msg) { banner.style.display = 'block'; banner.textContent = msg; }
+  if (checkWaterDue()) msg += '💧 Пора попить воды! ';
+  (db.customReminders||[]).forEach(r => {
+    if (isCustomReminderDue(r)) msg += `💊 ${r.name}! `;
+  });
+  if (msg) { banner.style.display = 'block'; banner.textContent = msg.trim(); }
   else banner.style.display = 'none';
+}
+
+// ============================================================
+// ПРОИЗВОЛЬНЫЕ НАПОМИНАНИЯ (таблетки и т.п.)
+// ============================================================
+function toggleCustomList() {
+  document.getElementById('customListContent').classList.toggle('open');
+  document.getElementById('customListToggle').classList.toggle('open');
+}
+function updateReminderTypeUI() {
+  const type = document.getElementById('crType').value;
+  document.getElementById('crDailyFields').style.display = type === 'daily' ? 'block' : 'none';
+  document.getElementById('crIntervalFields').style.display = type === 'interval' ? 'block' : 'none';
+}
+function addCustomReminder() {
+  const name = document.getElementById('crName').value.trim();
+  if (!name) { alert('Введите название напоминания'); return; }
+  const type = document.getElementById('crType').value;
+  const reminder = { id: Date.now().toString(), name, type };
+  if (type === 'daily') {
+    reminder.time = document.getElementById('crTime').value || '09:00';
+    reminder.lastDoneDate = null;
+  } else {
+    reminder.hours = parseInt(document.getElementById('crHours').value) || 8;
+    reminder.lastLog = null;
+  }
+  if (!db.customReminders) db.customReminders = [];
+  db.customReminders.push(reminder);
+  document.getElementById('crName').value = '';
+  save();
+  syncSettingsToServer();
+}
+function deleteCustomReminder(id) {
+  if (!confirm('Удалить это напоминание?')) return;
+  db.customReminders = (db.customReminders||[]).filter(r => r.id !== id);
+  save();
+  syncSettingsToServer();
+}
+function markCustomReminderDone(id) {
+  const r = (db.customReminders||[]).find(x => x.id === id);
+  if (!r) return;
+  if (r.type === 'interval') r.lastLog = new Date().toISOString();
+  else r.lastDoneDate = today();
+  save();
+  syncSettingsToServer();
+}
+function isCustomReminderDue(r) {
+  const now = new Date();
+  if (r.type === 'interval') {
+    if (!r.lastLog) return false; // ещё ни разу не отмечено — не спамим сразу
+    const next = new Date(r.lastLog).getTime() + r.hours*3600000;
+    return now.getTime() >= next;
+  } else {
+    const [h,m] = (r.time||'09:00').split(':').map(Number);
+    const scheduled = new Date(now); scheduled.setHours(h, m, 0, 0);
+    return now >= scheduled && r.lastDoneDate !== today();
+  }
+}
+function renderCustomReminders() {
+  const el = document.getElementById('customRemindersList');
+  const list = db.customReminders || [];
+  if (!list.length) { el.innerHTML = '<p class="hint">Пока нет ни одного. Добавь ниже.</p>'; return; }
+  el.innerHTML = list.map(r => {
+    let info = '';
+    if (r.type === 'daily') info = `каждый день в ${r.time}`;
+    else info = `каждые ${r.hours} ч` + (r.lastLog ? '' : ' (ещё не отмечено ни разу)');
+    return `
+      <div class="item">
+        <div class="itemhead">
+          <b>${esc(r.name)}</b>
+          <span class="pill">${info}</span>
+        </div>
+        <div class="item-actions" style="margin-top:6px;">
+          <button class="secondary small-btn" onclick="markCustomReminderDone('${r.id}')">✓ Отметить</button>
+          <button onclick="deleteCustomReminder('${r.id}')">🗑️</button>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 // ============================================================
@@ -1087,6 +1196,7 @@ function render() {
     <div class="item">📏 Параметры: <b>${nextReminder('measure')}</b></div>
   `;
   document.getElementById('reminders').innerHTML = remHtml;
+  renderCustomReminders();
   checkReminders();
 
   document.getElementById('waterEnabled').checked = !!db.settings.waterEnabled;
