@@ -100,6 +100,20 @@ canvas { display: block; width: 100%; height: 200px; background: #ffffff; border
 .day-total .over { color: #c62828; }
 .settings-row { display:flex; align-items:center; gap:10px; margin: 10px 0; }
 .settings-row input[type=checkbox] { width: auto; }
+.day-pills { display:flex; gap:6px; flex-wrap:wrap; }
+.day-pill { flex:1; min-width:38px; padding:12px 0; text-align:center; border-radius:12px; background:var(--card2); font-weight:700; border:1px solid var(--line); cursor:pointer; font-size:14px; }
+.day-pill.today { border-color: var(--orange); color: var(--orange); }
+.day-pill:active { transform: scale(0.95); }
+.modal-overlay { position: fixed; inset:0; background: rgba(0,0,0,0.45); z-index: 100; display:flex; align-items:flex-end; justify-content:center; }
+.modal-overlay.hidden { display:none; }
+.modal-sheet { background:#fff; width:100%; max-width:720px; border-radius: 24px 24px 0 0; padding:20px; max-height:82vh; overflow-y:auto; box-shadow: 0 -8px 32px rgba(0,0,0,0.2); }
+.modal-sheet-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; position:sticky; top:0; background:#fff; padding-bottom:8px; }
+.meal-block { padding:14px 0; border-bottom:1px solid var(--line); }
+.meal-block:last-child { border-bottom:none; }
+.meal-block-title { font-weight:800; color:var(--orange); font-size:16px; margin-bottom:4px; }
+.meal-block-desc { font-size:14.5px; line-height:1.5; color:var(--text); }
+.meal-block-stats { font-size:13px; color:var(--muted); margin-top:5px; }
+.meal-block-total { text-align:center; font-weight:800; color:var(--orange); padding-top:14px; font-size:15px; }
 .footer-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin: 18px 0 4px; }
 @media (max-width: 420px) {
   .app { padding: 12px; } .card { padding: 16px; } .grid { grid-template-columns: 1fr; }
@@ -112,6 +126,7 @@ canvas { display: block; width: 100%; height: 200px; background: #ffffff; border
 <div class="app">
 
 <section id="home" class="page active">
+  <img src="motivation.png" alt="Ты всё сможешь" style="width:100%; border-radius:20px; display:block; margin-bottom:14px;">
   <div class="card">
     <div class="muted">Моя цель</div>
     <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -288,7 +303,8 @@ canvas { display: block; width: 100%; height: 200px; background: #ffffff; border
   </div>
   <div class="card">
     <h2>📅 План питания на неделю</h2>
-    <div id="weekPlan"></div>
+    <p class="hint">Нажми на день, чтобы увидеть, что есть.</p>
+    <div class="day-pills" id="weekPlan"></div>
   </div>
 </section>
 
@@ -335,6 +351,16 @@ canvas { display: block; width: 100%; height: 200px; background: #ffffff; border
   <button onclick="showPage('measure',this)"><span>↕</span>Вес</button>
 </nav>
 
+<div class="modal-overlay hidden" id="dayModalOverlay" onclick="if(event.target===this) closeDayPlan()">
+  <div class="modal-sheet">
+    <div class="modal-sheet-header">
+      <h2 id="dayModalTitle" style="margin:0;">Понедельник</h2>
+      <button class="secondary small-btn" onclick="closeDayPlan()">✕ Закрыть</button>
+    </div>
+    <div id="dayModalContent"></div>
+  </div>
+</div>
+
 <script>
 // ============================================================
 // ДАННЫЕ
@@ -344,47 +370,54 @@ const KEY = 'myProgressV2';
 function generateWeekMenu() {
   return {
     monday: { meals: [
-      { name: 'Завтрак: Овсяная каша на молоке (40 г овсянки, 150 мл молока 1,5%) + 1 банан + 10 г грецких орехов', cal: 400 },
-      { name: 'Обед: Куриная грудка запечённая (150 г) + гречка варёная (80 г сухой) + салат из огурцов и помидоров с маслом (150 г)', cal: 420 },
-      { name: 'Перекус: Бутерброд с курицей: 2 ломтика цельнозернового хлеба (60 г) + курица отварная (50 г) + сыр 20 г + лист салата + огурец', cal: 420 },
-      { name: 'Ужин: Омлет из 2 яиц с помидорами и зеленью (без масла)', cal: 260 }
+      { name: 'Завтрак: Овсяная каша на молоке с бананом — 50 г овсянки + 195 мл молока 1,5% + 130 г банана', cal: 384, protein: 13.1 },
+      { name: 'Кофе без сахара + 20 г миндаля', cal: 116, protein: 4.2 },
+      { name: 'Обед: Куриная грудка с гречкой и овощным салатом — 100 г куриной грудки отварной/запечённой + 55 г гречки (сухой вес) + 50 г огурцов + 50 г помидоров + 5 г растительного масла', cal: 415, protein: 39.2 },
+      { name: 'Перекус: Бутерброд с курицей и сыром — 75 г цельнозернового хлеба + 65 г куриной грудки отварной/запечённой + 25 г сыра + 15 г листьев салата + 40 г огурцов', cal: 390, protein: 33.7 },
+      { name: 'Ужин: Омлет с помидорами — 2 яйца + 75 г помидоров', cal: 207, protein: 16.9 },
     ]},
     tuesday: { meals: [
-      { name: 'Завтрак: Сырники из 150 г творога 5% + 1 яйцо + 20 г муки (3 шт) + 30 г сметаны 10%', cal: 400 },
-      { name: 'Обед: Рыба (минтай) запечённая (150 г) + рис варёный (70 г сухого) + овощной салат (150 г)', cal: 420 },
-      { name: 'Перекус: Творог 5% (150 г) + огурец + зелень + 2 хлебца + 1 яйцо варёное', cal: 420 },
-      { name: 'Ужин: Салат с тунцом: 80 г тунца консервированного + 1 яйцо + листья салата, помидоры, огурец, заправка из йогурта', cal: 260 }
+      { name: 'Завтрак: Сырники со сметаной — 160 г творога 5% + 1 яйцо + 20 г муки + 30 г сметаны 10%', cal: 386, protein: 37.2 },
+      { name: 'Кофе без сахара + 18 г грецких орехов', cal: 118, protein: 2.7 },
+      { name: 'Обед: Минтай с рисом и овощным салатом — 145 г минтая запечённого + 70 г риса (сухой вес) + 70 г огурцов + 70 г помидоров', cal: 397, protein: 34.9 },
+      { name: 'Перекус: Творог с хлебцами и яйцом — 180 г творога 5% + 60 г огурцов + 25 г хлебцев + 1 яйцо', cal: 397, protein: 41.1 },
+      { name: 'Ужин: Салат с тунцом и яйцом — 90 г тунца консервированного + 1 яйцо + 10 г листьев салата + 65 г помидоров + 65 г огурцов', cal: 213, protein: 31.3 },
     ]},
     wednesday: { meals: [
-      { name: 'Завтрак: Яичница из 2 яиц с помидорами и шпинатом + 1 ломтик цельнозернового хлеба (30 г)', cal: 400 },
-      { name: 'Обед: Индейка тушёная (140 г) + булгур варёный (70 г сухого) + салат из капусты и моркови (150 г)', cal: 420 },
-      { name: 'Перекус: Салат с курицей и авокадо: курица отварная 70 г + авокадо 50 г + листья салата + помидоры + заправка лимонный сок', cal: 420 },
-      { name: 'Ужин: Творог 5% (120 г) + ягоды (50 г, можно замороженные)', cal: 260 }
+      { name: 'Завтрак: Яичница с помидорами и хлебом — 3 яйца + 80 г помидоров + 30 г листьев салата + 50 г цельнозернового хлеба', cal: 392, protein: 26.4 },
+      { name: 'Кофе без сахара + 20 г тёмного шоколада 85%', cal: 120, protein: 1.6 },
+      { name: 'Обед: Индейка с булгуром и овощами — 115 г индейки тушёной + 60 г булгура (сухой вес) + 80 г капусты + 40 г моркови', cal: 397, protein: 42.1 },
+      { name: 'Перекус: Салат с курицей и авокадо — 130 г куриной грудки отварной/запечённой + 95 г авокадо + 40 г листьев салата + 95 г помидоров', cal: 390, protein: 43.6 },
+      { name: 'Ужин: Творог с ягодами — 155 г творога 5% + 65 г ягод', cal: 214, protein: 26.9 },
     ]},
     thursday: { meals: [
-      { name: 'Завтрак: Творожная запеканка (200 г творога 5% + 1 яйцо + 20 г муки) + 50 г ягод', cal: 400 },
-      { name: 'Обед: Тефтели из говядины (150 г) + макароны твёрдых сортов (60 г сухих) + томатный соус (30 г)', cal: 420 },
-      { name: 'Перекус: Бутерброд с тунцом на хлебцах: 2 хлебца + 50 г тунца + огурец + зелень', cal: 420 },
-      { name: 'Ужин: Овощной суп-пюре (200 мл) + 1 яйцо варёное', cal: 260 }
+      { name: 'Завтрак: Творожная запеканка с ягодами — 190 г творога 5% + 1 яйцо + 20 г муки + 45 г ягод', cal: 390, protein: 40.5 },
+      { name: 'Кофе без сахара + 20 г миндаля', cal: 116, protein: 4.2 },
+      { name: 'Обед: Тефтели из говядины с макаронами — 115 г тефтелей из говядины + 45 г макарон тв.сортов (сухой вес) + 25 г томатного соуса', cal: 392, protein: 28.9 },
+      { name: 'Перекус: Хлебцы с тунцом и огурцом — 60 г хлебцев + 155 г тунца консервированного + 125 г огурцов', cal: 385, protein: 45.9 },
+      { name: 'Ужин: Яйцо с овощами — 2 яйца + 130 г огурцов + 130 г помидоров', cal: 213, protein: 16.5 },
     ]},
     friday: { meals: [
-      { name: 'Завтрак: Гранола (40 г) + йогурт натуральный (150 г) + ягоды (50 г)', cal: 400 },
-      { name: 'Обед: Запечённая курица (150 г) + картофель запечённый (150 г) + салат из свежих овощей (100 г)', cal: 420 },
-      { name: 'Перекус: Лаваш с курицей и овощами: лаваш 50 г + курица 60 г + листья салата + огурец + помидор', cal: 420 },
-      { name: 'Ужин: Омлет с грибами (2 яйца + 50 г шампиньонов)', cal: 260 }
+      { name: 'Завтрак: Гранола с йогуртом и ягодами — 55 г гранолы + 200 г натурального йогурта + 65 г ягод', cal: 394, protein: 14.6 },
+      { name: 'Кофе без сахара + 18 г грецких орехов', cal: 118, protein: 2.7 },
+      { name: 'Обед: Курица с запечённым картофелем — 145 г куриной грудки отварной/запечённой + 145 г картофеля запечённого + 50 г огурцов + 50 г помидоров', cal: 391, protein: 48.8 },
+      { name: 'Перекус: Лаваш с курицей и овощами — 85 г лаваша + 100 г куриной грудки отварной/запечённой + 35 г листьев салата + 65 г огурцов + 50 г помидоров', cal: 390, protein: 39.2 },
+      { name: 'Ужин: Омлет с грибами — 2 яйца + 60 г шампиньонов', cal: 210, protein: 18.8 },
     ]},
     saturday: { meals: [
-      { name: 'Завтрак: Пшённая каша на воде (40 г) + молоко 1,5% (50 мл) + 1 банан + 10 г грецких орехов', cal: 400 },
-      { name: 'Обед: Индейка (140 г) + гречка (80 г сухой) + тушёная капуста (150 г)', cal: 420 },
-      { name: 'Перекус: Салат с яйцом и овощами: 2 яйца варёных + огурцы + помидоры + зелень + заправка из йогурта', cal: 420 },
-      { name: 'Ужин: Салат с креветками: 80 г креветок + листья салата + помидоры + огурец + заправка лимонный сок', cal: 260 }
+      { name: 'Завтрак: Пшённая каша с бананом — 60 г пшена (сухой вес) + 75 мл молока 1,5% + 150 г банана', cal: 393, protein: 10.7 },
+      { name: 'Кофе без сахара + 20 г тёмного шоколада 85%', cal: 120, protein: 1.6 },
+      { name: 'Обед: Индейка с гречкой и тушёной капустой — 110 г индейки тушёной + 60 г гречки (сухой вес) + 115 г капусты', cal: 383, protein: 41.4 },
+      { name: 'Перекус: Салат с яйцом, творогом и овощами — 2 яйца + 130 г творога 5% + 120 г огурцов + 120 г помидоров + 60 г натурального йогурта', cal: 388, protein: 39.7 },
+      { name: 'Ужин: Салат с креветками — 165 г креветок варёных + 40 г листьев салата + 125 г помидоров + 125 г огурцов', cal: 211, protein: 37.2 },
     ]},
     sunday: { meals: [
-      { name: 'Завтрак: Блины из овсяной муки (2 шт, 40 г муки + 1 яйцо + молоко) с творогом 5% (50 г) и ягодами', cal: 400 },
-      { name: 'Обед: Куриный суп с лапшой (200 мл бульона с кусочками курицы) + 30 г хлеба', cal: 420 },
-      { name: 'Перекус: Бутерброд с индейкой и сыром: 2 ломтика хлеба (60 г) + индейка 50 г + сыр 20 г + овощи', cal: 420 },
-      { name: 'Ужин: Творог 5% (120 г) + 10 г грецких орехов', cal: 260 }
-    ]}
+      { name: 'Завтрак: Блинчики с творогом и ягодами — 45 г муки + 1 яйцо + 70 мл молока 1,5% + 60 г творога 5% + 60 г ягод', cal: 384, protein: 24.9 },
+      { name: 'Кофе без сахара + 20 г миндаля', cal: 116, protein: 4.2 },
+      { name: 'Обед: Куриный суп с лапшой и хлебом — 250 мл куриного супа с лапшой + 35 г цельнозернового хлеба', cal: 388, protein: 28.1 },
+      { name: 'Перекус: Бутерброд с индейкой и сыром — 80 г цельнозернового хлеба + 65 г индейки тушёной + 25 г сыра + 40 г огурцов + 40 г помидоров', cal: 388, protein: 33.0 },
+      { name: 'Ужин: Творог с орехами — 120 г творога 5% + 10 г грецких орехов', cal: 211, protein: 21.9 },
+    ]},
   };
 }
 
@@ -494,6 +527,7 @@ function editWorkout(i) {
 // ============================================================
 // ТАЙМЕР
 // ============================================================
+const PREP_SECONDS = 5;
 function timerStart() {
   const work = parseInt(document.getElementById('timerWork').value) || 30;
   const rest = parseInt(document.getElementById('timerRest').value) || 10;
@@ -511,12 +545,14 @@ function timerStart() {
     return;
   }
 
-  timer.currentRound = 1;
-  timer.phase = 'work';
-  timer.timeLeft = timer.work;
+  timer.currentRound = 0;
+  timer.phase = 'prep';
+  timer.timeLeft = PREP_SECONDS;
   timer.running = true;
   timer.isPaused = false;
   document.getElementById('timerStartBtn').textContent = '▶ Старт';
+  document.getElementById('timerPhase').textContent = '⏳ Приготовься';
+  document.getElementById('timerCurrentRound').textContent = '0';
   clearInterval(timer.interval);
   timer.interval = setInterval(tick, 1000);
   updateTimerDisplay();
@@ -536,6 +572,29 @@ function timerReset() {
   document.getElementById('timerCurrentRound').textContent = '0';
 }
 function tick() {
+  // Фаза подготовки перед первым подходом
+  if (timer.phase === 'prep') {
+    if (timer.timeLeft === 2 || timer.timeLeft === 1) playWarnShort();
+    if (timer.timeLeft <= 0) {
+      playGoSignal();
+      timer.phase = 'work';
+      timer.currentRound = 1;
+      timer.timeLeft = timer.work;
+      document.getElementById('timerPhase').textContent = `💪 Работа 1/${timer.rounds}`;
+      document.getElementById('timerCurrentRound').textContent = '1';
+      updateTimerDisplay();
+      return;
+    }
+    timer.timeLeft--;
+    updateTimerDisplay();
+    return;
+  }
+
+  // Короткие предупреждающие сигналы за 3 секунды до конца подхода/отдыха
+  if ((timer.phase === 'work' || timer.phase === 'rest') && timer.timeLeft <= 3 && timer.timeLeft > 0) {
+    playWarnShort();
+  }
+
   if (timer.timeLeft <= 0) {
     playBeep();
     if (timer.phase === 'work') {
@@ -576,6 +635,28 @@ function playBeep() {
     osc.connect(gain); gain.connect(ctx.destination);
     osc.frequency.value = 880; osc.type = 'square'; gain.gain.value = 0.3;
     osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.15);
+  } catch(e) {}
+}
+// Короткий тихий сигнал-предупреждение (последние секунды подхода/отдыха/подготовки)
+function playWarnShort() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = 660; osc.type = 'square'; gain.gain.value = 0.22;
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.08);
+  } catch(e) {}
+}
+// Сигнал "старт!" — отличается от обычного, чтобы было понятно, что тренировка началась
+function playGoSignal() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = 1046; osc.type = 'square'; gain.gain.value = 0.35;
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.3);
   } catch(e) {}
 }
 
@@ -659,67 +740,34 @@ function backfillFoodLog() {
 // ============================================================
 // НЕДЕЛЬНОЕ МЕНЮ
 // ============================================================
+const MEAL_BLOCK_TITLES = ['🍳 Завтрак', '☕ Кофе-перекус', '🍽 Обед', '🥪 Перекус', '🌙 Ужин'];
+const DAY_NAMES_FULL = { monday:'Понедельник', tuesday:'Вторник', wednesday:'Среда', thursday:'Четверг', friday:'Пятница', saturday:'Суббота', sunday:'Воскресенье' };
+
 function renderWeekMenu() {
   const container = document.getElementById('weekPlan');
   const days = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
   const dayNames = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
-  let html = '';
-  days.forEach((key, idx) => {
-    const day = db.weekMenu[key];
-    const total = day.meals.reduce((sum, m) => sum + (m.cal || 0), 0);
-    const totalProtein = Math.round(day.meals.reduce((sum, m) => sum + (m.protein || 0), 0)*10)/10;
-    const over = total > db.settings.normal * 1.05;
-    html += `
-      <div class="day-toggle" onclick="toggleDay('${key}')">
-        <span>${dayNames[idx]} <span class="muted">(${total} ккал · ${totalProtein} г белка)</span></span>
-        <span class="arrow">▼</span>
-      </div>
-      <div class="day-content" id="day-${key}">
-        ${day.meals.map((meal, mi) => `
-          <div class="meal-row">
-            <textarea class="meal-name" data-day="${key}" data-idx="${mi}" placeholder="Название" rows="2">${esc(meal.name)}</textarea>
-            <div class="meal-row-sub">
-              <input type="number" class="meal-cal" value="${meal.cal}" data-day="${key}" data-idx="${mi}" placeholder="ккал">
-              <span class="muted small" style="white-space:nowrap;">${meal.protein!=null? meal.protein+' г белка':''}</span>
-              <button onclick="removeMeal('${key}', ${mi})">✕</button>
-            </div>
-          </div>
-        `).join('')}
-        <button class="secondary" onclick="addMeal('${key}')" style="font-size:13px;padding:6px 12px;">+ Добавить приём</button>
-        <div class="day-total ${over?'over':''}">Итого: ${total} ккал · ${totalProtein} г белка ${over?'⚠️ заметно выше нормы':''}</div>
-      </div>
-    `;
-  });
-  container.innerHTML = html;
-
-  document.querySelectorAll('.meal-name, .meal-cal').forEach(el => {
-    el.addEventListener('change', function() {
-      const day = this.dataset.day;
-      const idx = parseInt(this.dataset.idx);
-      const meals = db.weekMenu[day].meals;
-      if (this.classList.contains('meal-name')) { meals[idx].name = this.value; }
-      else { meals[idx].cal = parseFloat(this.value) || 0; }
-      save();
-      renderWeekMenu();
-    });
-  });
+  const todayKey = weekdayKeyFromDate(today());
+  container.innerHTML = days.map((key, idx) => `
+    <div class="day-pill ${key===todayKey?'today':''}" onclick="openDayPlan('${key}')">${dayNames[idx]}</div>
+  `).join('');
 }
-function toggleDay(key) {
-  const content = document.getElementById('day-'+key);
-  const toggle = content.previousElementSibling;
-  content.classList.toggle('open');
-  toggle.classList.toggle('open');
+function openDayPlan(key) {
+  const day = db.weekMenu[key];
+  const total = day.meals.reduce((sum, m) => sum + (m.cal || 0), 0);
+  const totalProtein = Math.round(day.meals.reduce((sum, m) => sum + (m.protein || 0), 0)*10)/10;
+  document.getElementById('dayModalTitle').textContent = DAY_NAMES_FULL[key] || key;
+  document.getElementById('dayModalContent').innerHTML = day.meals.map((meal, mi) => `
+    <div class="meal-block">
+      <div class="meal-block-title">${MEAL_BLOCK_TITLES[mi] || ''}</div>
+      <div class="meal-block-desc">${esc(meal.name.replace(/^[^:]+:\s*/, ''))}</div>
+      <div class="meal-block-stats">${meal.cal} ккал${meal.protein!=null ? ' · '+meal.protein+' г белка' : ''}</div>
+    </div>
+  `).join('') + `<div class="meal-block-total">Итого за день: ${total} ккал · ${totalProtein} г белка</div>`;
+  document.getElementById('dayModalOverlay').classList.remove('hidden');
 }
-function addMeal(key) {
-  db.weekMenu[key].meals.push({ name: 'Новый приём', cal: 100 });
-  save();
-  renderWeekMenu();
-}
-function removeMeal(key, idx) {
-  if (db.weekMenu[key].meals.length <= 1) { alert('Должен быть хотя бы один приём'); return; }
-  db.weekMenu[key].meals.splice(idx, 1);
-  save();
-  renderWeekMenu();
+function closeDayPlan() {
+  document.getElementById('dayModalOverlay').classList.add('hidden');
 }
 
 // ============================================================
