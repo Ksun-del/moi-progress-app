@@ -115,6 +115,43 @@ canvas { display: block; width: 100%; height: 200px; background: #ffffff; border
 .meal-block-stats { font-size:13px; color:var(--muted); margin-top:5px; }
 .meal-block-total { text-align:center; font-weight:800; color:var(--orange); padding-top:14px; font-size:15px; }
 .footer-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin: 18px 0 4px; }
+/* ===== Питание: что ела ===== */
+.eat-total { display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-top:14px; flex-wrap:wrap; }
+.eat-kcal b { font-size: 32px; font-weight: 800; color: var(--orange); letter-spacing: -1px; }
+.progress.over i { background: #e53935; }
+.water-row { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:14px;
+  padding-top:12px; border-top:1px solid var(--line); }
+.slot { display:flex; gap:12px; align-items:center; padding:12px 0; border-top:1px solid var(--line); cursor:pointer; }
+.slot:first-child { border-top:0; }
+.slot-main { flex:1; min-width:0; }
+.slot-label { font-size:12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.4px; }
+.slot-name { font-weight:600; margin-top:2px; line-height:1.3; }
+.slot-name.skip { color:var(--muted); text-decoration: line-through; font-weight:500; }
+.slot-kcal { text-align:right; white-space:nowrap; font-weight:700; }
+.slot-kcal small { display:block; font-weight:500; color:var(--muted); font-size:12px; }
+.tag { display:inline-block; font-size:11px; padding:1px 8px; border-radius:99px; margin-left:6px; vertical-align:1px;
+  background:#fff1e0; color:#b35300; font-weight:600; text-transform:none; letter-spacing:0; }
+.slot-x { background:transparent; color:var(--muted); padding:4px 8px; font-size:16px; }
+.sheet-bg { position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:40; display:none; }
+.sheet { position:fixed; left:0; right:0; bottom:0; z-index:41; background:#fff; border-radius:22px 22px 0 0;
+  max-height:85vh; overflow-y:auto; padding:16px 16px calc(20px + env(safe-area-inset-bottom));
+  transform:translateY(100%); transition:transform .25s; width:min(100%,720px); margin:auto; }
+.sheet.open { transform:none; }
+.sheet-bg.open { display:block; }
+.sheet-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+.sheet-actions { display:flex; gap:8px; flex-wrap:wrap; margin:10px 0 4px; }
+.sheet-actions:empty { display:none; }
+.calc-box { background:#fff6e0; border-radius:14px; padding:12px 14px; margin-top:10px; font-size:14px; line-height:1.5; }
+.calc-box .miss { color:#c62828; }
+.calc-box .btns { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.dish { padding:11px 0; border-top:1px solid var(--line); cursor:pointer; display:flex; gap:10px; }
+.dish:active { background: var(--card2); }
+.dish-main { flex:1; min-width:0; }
+.dish-name { font-weight:600; line-height:1.3; }
+.dish-sub { font-size:12px; color:var(--muted); margin-top:2px; line-height:1.35; }
+.dish-kcal { white-space:nowrap; font-weight:700; text-align:right; }
+.dish-kcal small { display:block; font-weight:500; color:var(--muted); font-size:12px; }
+.group-title { font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin:16px 0 2px; }
 @media (max-width: 420px) {
   .app { padding: 12px; } .card { padding: 16px; } .grid { grid-template-columns: 1fr; }
   .grid3 { grid-template-columns: 1fr 1fr; } nav button { font-size: 10px; } nav button span { font-size: 20px; }
@@ -148,9 +185,9 @@ canvas { display: block; width: 100%; height: 200px; background: #ffffff; border
     <p class="hint">Короткая сводка за сегодняшний день — заполняется автоматически, когда ты добавляешь тренировку или питание на соответствующих вкладках.</p>
     <div class="grid">
       <div class="stat"><span class="muted">Тренировка</span><b id="homeWorkout">—</b><span class="cap">была ли сегодня</span></div>
-      <div class="stat"><span class="muted">Питание</span><b id="homeFood">—</b><span class="cap">по плану / нет</span></div>
-      <div class="stat"><span class="muted">Белок</span><b id="homeProtein">—</b><span class="cap">введено вручную</span></div>
-      <div class="stat"><span class="muted">Ккал</span><b id="homeKcal">—</b><span class="cap">введено вручную</span></div>
+      <div class="stat"><span class="muted">Питание</span><b id="homeFood">—</b><span class="cap">✓ по плану · ↗ меняла</span></div>
+      <div class="stat"><span class="muted">Белок</span><b id="homeProtein">—</b><span class="cap">съедено за день</span></div>
+      <div class="stat"><span class="muted">Ккал</span><b id="homeKcal">—</b><span class="cap">съедено за день</span></div>
     </div>
     <div id="todayActions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;"></div>
   </div>
@@ -294,14 +331,28 @@ canvas { display: block; width: 100%; height: 200px; background: #ffffff; border
       <h2 style="margin:0;">Дневное питание</h2>
       <input id="fDate" type="date" style="width:auto; max-width:150px;" onchange="updateFoodAutoInfo()">
     </div>
-    <div class="choice choice-sm" style="margin-top:12px;">
-      <button id="foodYes" onclick="setFoodStatus('yes')">По плану</button>
-      <button id="foodChanged" onclick="setFoodStatus('changed')">Изменила</button>
-      <button id="foodOff" onclick="setFoodStatus('off')">Не по плану</button>
+    <div class="eat-total">
+      <div class="eat-kcal"><b id="eatKcal">0</b> <span class="muted">/ <span id="eatKcalNorm">1500</span> ккал</span></div>
+      <div class="muted" id="eatProtein">0 / 110 г белка</div>
     </div>
-    <div id="fAutoInfo" class="hint" style="display:none;"></div>
+    <div class="progress"><i id="eatBar" style="width:0%"></i></div>
+    <div id="eatLeft" class="hint" style="margin:0;"></div>
+    <div class="water-row" id="waterRow">
+      <span>💧 Вода: <b id="waterCount">0</b> <span id="waterWord">стаканов</span></span>
+      <span style="display:flex;gap:6px;">
+        <button class="secondary small-btn" onclick="undoWater()">−</button>
+        <button class="small-btn" onclick="logWater()">+ стакан</button>
+      </span>
+    </div>
   </div>
 
+  <div class="card">
+    <h2>Что ела</h2>
+    <p class="hint">По умолчанию — как в плане. Нажми на приём пищи, чтобы выбрать другое блюдо или написать своё.</p>
+    <div id="eatSlots"></div>
+    <div id="eatExtras"></div>
+    <button class="secondary block" style="margin-top:12px;" onclick="openPicker('extra')">+ Ещё что-то съела</button>
+  </div>
   <div class="card">
     <h2>🍳 Что приготовить сегодня вечером</h2>
     <p class="hint">Долгие вещи (крупы, мясо) на завтра — чтобы утром просто разогреть.</p>
@@ -365,6 +416,21 @@ canvas { display: block; width: 100%; height: 200px; background: #ffffff; border
   <button onclick="showPage('measure',this)"><span>↕</span>Вес</button>
 </nav>
 
+<!-- Выбор блюда (всплывающая панель снизу) -->
+<div id="pickerBg" class="sheet-bg" onclick="closePicker()"></div>
+<div id="picker" class="sheet">
+  <div class="sheet-head">
+    <h2 id="pickerTitle" style="margin:0;">Завтрак</h2>
+    <button class="secondary small-btn" onclick="closePicker()">✕</button>
+  </div>
+  <input id="pickerInput" type="text" autocomplete="off"
+    placeholder="Найти блюдо или написать: гречка 150 г, индейка 120 г"
+    oninput="renderPicker()">
+  <div id="pickerCalc"></div>
+  <div id="pickerActions" class="sheet-actions"></div>
+  <div id="pickerList"></div>
+</div>
+
 <div class="modal-overlay hidden" id="dayModalOverlay" onclick="if(event.target===this) closeDayPlan()">
   <div class="modal-sheet">
     <div class="modal-sheet-header">
@@ -380,6 +446,23 @@ canvas { display: block; width: 100%; height: 200px; background: #ffffff; border
 // ДАННЫЕ
 // ============================================================
 const KEY = 'myProgressV2';
+
+// ==== Работа внутри приложения Android (Expo) ====
+// Когда страница открыта в приложении, есть window.ReactNativeWebView.
+const IN_APP = !!window.ReactNativeWebView;
+function toApp(type, data) {
+  try { window.ReactNativeWebView.postMessage(JSON.stringify({ type, data })); } catch (e) {}
+}
+// Кнопка «Назад» на телефоне: сначала закрываем открытые окна, потом выходим
+window.__onBack = function () {
+  const picker = document.getElementById('picker');
+  if (picker && picker.classList.contains('open')) { closePicker(); return; }
+  const day = document.getElementById('dayModalOverlay');
+  if (day && !day.classList.contains('hidden')) { closeDayPlan(); return; }
+  const active = document.querySelector('.page.active');
+  if (active && active.id !== 'home') { showPage('home'); return; }
+  toApp('exit');
+};
 
 function generateWeekMenuA() {
   return {
@@ -551,7 +634,8 @@ try {
   const raw = localStorage.getItem(KEY);
   if (raw) {
     const parsed = JSON.parse(raw);
-    if (parsed.weekMenu && typeof parsed.weekMenu === 'object' && Object.keys(parsed.weekMenu).length === 7) {
+    // Раньше здесь требовалось старое поле weekMenu — без него ВСЕ данные сбрасывались при каждом открытии
+    if (parsed && typeof parsed === 'object' && parsed.settings) {
       db = parsed;
     } else {
       db = defaultData;
@@ -583,14 +667,24 @@ function getMenuForDate(dateStr) {
   return { menu: MENUS[idx][key], menuIndex: idx };
 }
 
-let selectedFood = 'yes';
+const days = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
 let currentMetric = 'weight';
 let notifyInterval = null;
 
 let timer = { work: 30, rest: 10, rounds: 5, currentRound: 0, phase: 'idle', timeLeft: 0, interval: null, isPaused: false, running: false };
 
-const today = () => new Date().toISOString().slice(0,10);
-const save = () => { localStorage.setItem(KEY, JSON.stringify(db)); render(); };
+// Дата в формате YYYY-MM-DD по МЕСТНОМУ времени телефона
+// (раньше бралась по UTC — ночью до 2–3 часов показывался вчерашний день)
+function localDate(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+const today = () => localDate(new Date());
+const save = () => {
+  const json = JSON.stringify(db);
+  try { localStorage.setItem(KEY, json); } catch (e) {}
+  if (IN_APP) toApp('save', { json });   // копия в память приложения — не пропадёт при очистке WebView
+  render();
+};
 
 // ============================================================
 // ВСПОМОГАТЕЛЬНЫЕ
@@ -793,16 +887,6 @@ function playGoSignal() {
 // ============================================================
 // ПИТАНИЕ
 // ============================================================
-function highlightFoodStatus(s) {
-  ['Yes','Changed','Off'].forEach(x => document.getElementById('food'+x).classList.remove('selected'));
-  document.getElementById('food'+({yes:'Yes', changed:'Changed', off:'Off'}[s])).classList.add('selected');
-}
-function setFoodStatus(s) {
-  selectedFood = s;
-  highlightFoodStatus(s);
-  updateFoodAutoInfo();
-  saveFoodNow();
-}
 // Возвращает ключ дня недели (monday..sunday) для строки даты YYYY-MM-DD
 function weekdayKeyFromDate(dateStr) {
   const keys = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
@@ -817,30 +901,454 @@ function planTotalsForDate(dateStr) {
   const protein = menu.meals.reduce((s,m) => s + (m.protein||0), 0);
   return { kcal: Math.round(kcal), protein: Math.round(protein*10)/10 };
 }
-function updateFoodAutoInfo() {
-  const date = getDateInput('fDate');
-  const info = document.getElementById('fAutoInfo');
-  if (selectedFood === 'yes') {
-    const t = planTotalsForDate(date);
-    info.style.display = 'block';
-    info.textContent = `${t.kcal} ккал, ${t.protein} г белка — записано автоматически.`;
-  } else {
-    info.style.display = 'block';
-    info.textContent = 'Отмечено, без подсчёта калорий.';
-  }
+// ============================================================
+// ЧТО ЕЛА: выбор блюд вместо плана + подсчёт по продуктам
+// ============================================================
+// db.eaten['2026-09-28'] = {
+//   slots:  { '0': {name, cal, protein} | 'skip' }   — заменённые приёмы (нет ключа = как в плане)
+//   extras: [ {name, cal, protein} ]                  — «ещё съела»
+// }
+
+// Категория приёма по названию в плане («Завтрак: …» → Завтрак; кофе и прочее → Перекус)
+function mealCategory(name) {
+  const m = String(name||'').match(/^\s*(Завтрак|Обед|Перекус|Ужин)\s*:/i);
+  return m ? m[1][0].toUpperCase() + m[1].slice(1).toLowerCase() : 'Перекус';
 }
-function saveFoodNow() {
-  const date = getDateInput('fDate');
-  let protein = null, kcal = null;
-  if (selectedFood === 'yes') {
-    const t = planTotalsForDate(date);
-    kcal = t.kcal; protein = t.protein;
+// «Завтрак: Сырники со сметаной — 160 г творога…» → {title: 'Сырники со сметаной', details: '160 г творога…'}
+function splitDishName(name) {
+  let s = String(name||'').replace(/^\s*(Завтрак|Обед|Перекус|Ужин)\s*:\s*/i, '');
+  const i = s.indexOf(' — ');
+  return i > 0 ? { title: s.slice(0, i), details: s.slice(i+3) } : { title: s, details: '' };
+}
+function r1(x) { return Math.round((x||0)*10)/10; }
+
+function eatenFor(date) {
+  if (!db.eaten) db.eaten = {};
+  if (!db.eaten[date]) db.eaten[date] = { slots: {}, extras: [] };
+  return db.eaten[date];
+}
+// Что на самом деле в каждом приёме за день
+function dayMeals(date) {
+  const plan = (getMenuForDate(date).menu || {meals: []}).meals;
+  const e = (db.eaten && db.eaten[date]) || { slots: {}, extras: [] };
+  return plan.map((pm, i) => {
+    const o = e.slots[i];
+    if (o === 'skip') return { cat: mealCategory(pm.name), plan: pm, skip: true, cal: 0, protein: 0 };
+    if (o) return { cat: mealCategory(pm.name), plan: pm, custom: true, name: o.name, cal: o.cal||0, protein: o.protein||0 };
+    return { cat: mealCategory(pm.name), plan: pm, name: pm.name, cal: pm.cal||0, protein: pm.protein||0 };
+  });
+}
+function dayTotals(date) {
+  const meals = dayMeals(date);
+  const e = (db.eaten && db.eaten[date]) || { slots: {}, extras: [] };
+  let kcal = 0, protein = 0;
+  meals.forEach(m => { kcal += m.cal; protein += m.protein; });
+  (e.extras||[]).forEach(x => { kcal += x.cal||0; protein += x.protein||0; });
+  const changed = meals.some(m => m.custom || m.skip) || (e.extras||[]).length > 0;
+  return { kcal: Math.round(kcal), protein: r1(protein), changed };
+}
+// Обновляет запись дня в db.food (её использует Главная и история)
+function syncFoodDay(date) {
+  const t = dayTotals(date);
+  const item = { date, status: t.changed ? 'changed' : 'yes', kcal: t.kcal, protein: t.protein };
+  const idx = db.food.findIndex(x => x.date === date);
+  if (idx >= 0) db.food[idx] = item; else db.food.push(item);
+}
+function updateFoodAutoInfo() { foodDate = document.getElementById('fDate').value || today(); renderEaten(); }
+
+// ---------- База продуктов: ккал и белок на 100 г ----------
+// k — стемы, которые должны встретиться в тексте (выигрывает самое точное совпадение)
+// pc — вес одной штуки, г; tb — вес столовой ложки, г
+const PRODUCTS = [
+  // Крупы готовые / сухие
+  { n:'Гречка варёная', k:['греч'], kcal:110, p:4.2 },
+  { n:'Гречка сухая', k:['греч','сух'], kcal:313, p:12.6 },
+  { n:'Булгур варёный', k:['булгур'], kcal:83, p:3.1 },
+  { n:'Булгур сухой', k:['булгур','сух'], kcal:342, p:12.3 },
+  { n:'Киноа варёная', k:['киноа'], kcal:120, p:4.4 },
+  { n:'Киноа сухая', k:['киноа','сух'], kcal:368, p:14.1 },
+  { n:'Рис варёный', k:['рис'], kcal:116, p:2.7 },
+  { n:'Рис сухой', k:['рис','сух'], kcal:344, p:6.7 },
+  { n:'Овсяные хлопья (сухие)', k:['овс'], kcal:352, p:12.3 },
+  { n:'Овсянка на воде (готовая)', k:['овсян','вод'], kcal:88, p:3 },
+  { n:'Пшено сухое', k:['пшен'], kcal:342, p:11.5 },
+  { n:'Макароны варёные', k:['макарон'], kcal:112, p:3.5 },
+  { n:'Макароны сухие', k:['макарон','сух'], kcal:344, p:11 },
+  { n:'Картофель варёный', k:['картоф'], kcal:82, p:2 },
+  { n:'Картофель запечённый', k:['картоф','запеч'], kcal:93, p:2.5 },
+  { n:'Картофельное пюре', k:['пюре'], kcal:90, p:2 },
+  // Мясо, птица
+  { n:'Куриная грудка варёная/запечённая', k:['кур'], kcal:137, p:29.8 },
+  { n:'Куриная грудка сырая', k:['кур','сыр'], kcal:113, p:23.6 },
+  { n:'Куриный фарш', k:['кур','фарш'], kcal:143, p:17.4 },
+  { n:'Куриные тефтели запечённые', k:['тефтел'], kcal:160, p:20 },
+  { n:'Индейка запечённая', k:['индей'], kcal:135, p:28 },
+  { n:'Индейка сырая', k:['индей','сыр'], kcal:114, p:23 },
+  { n:'Говядина варёная', k:['говя'], kcal:254, p:25.8 },
+  { n:'Говяжий фарш', k:['говя','фарш'], kcal:254, p:17 },
+  { n:'Свинина', k:['свин'], kcal:259, p:16 },
+  // Рыба, морепродукты
+  { n:'Красная рыба слабосолёная', k:['рыб','крас'], kcal:202, p:22.5 },
+  { n:'Сёмга / лосось солёный', k:['семг'], kcal:202, p:22.5 },
+  { n:'Лосось', k:['лосос'], kcal:202, p:22.5 },
+  { n:'Форель', k:['форел'], kcal:186, p:21 },
+  { n:'Минтай запечённый', k:['минта'], kcal:80, p:17 },
+  { n:'Треска', k:['треск'], kcal:78, p:17 },
+  { n:'Тунец консервированный', k:['тунец'], kcal:96, p:21 },
+  { n:'Креветки варёные', k:['кревет'], kcal:95, p:18.9 },
+  // Яйца, молочное
+  { n:'Яйцо', k:['яйц'], kcal:157, p:12.7, pc:55 },
+  { n:'Яйцо', k:['яйко'], kcal:157, p:12.7, pc:55 },
+  { n:'Творог 5%', k:['творог'], kcal:121, p:17.2 },
+  { n:'Творог 0%', k:['творог','0'], kcal:71, p:16.5 },
+  { n:'Творог 9%', k:['творог','9'], kcal:159, p:16.7 },
+  { n:'Творожные вафли', k:['творож','вафл'], kcal:190, p:17 },
+  { n:'Картофельные вафли', k:['картоф','вафл'], kcal:115, p:4 },
+  { n:'Сырники без сахара', k:['сырник'], kcal:190, p:17, pc:60 },
+  { n:'Греческий йогурт', k:['йогурт'], kcal:70, p:8 },
+  { n:'Молоко 1,5%', k:['молок'], kcal:44, p:3 },
+  { n:'Молоко 3,2%', k:['молок','3'], kcal:59, p:2.9 },
+  { n:'Кефир 1%', k:['кефир'], kcal:40, p:2.8 },
+  { n:'Сметана 10%', k:['сметан'], kcal:115, p:3, tb:20 },
+  { n:'Сметана 15%', k:['сметан','15'], kcal:158, p:2.6, tb:20 },
+  { n:'Сыр «Весёлый Роджер» 20%', k:['роджер'], kcal:217, p:20 },
+  { n:'Сыр полутвёрдый', k:['сыр'], kcal:350, p:24 },
+  { n:'Сыр фета', k:['фет'], kcal:264, p:14 },
+  { n:'Моцарелла', k:['моцарел'], kcal:253, p:18 },
+  { n:'Масло сливочное', k:['масл','слив'], kcal:748, p:0.5, tb:15 },
+  // Хлеб, мука
+  { n:'Лепёшка пшеничная', k:['лепеш'], kcal:300, p:8.5, pc:40 },
+  { n:'Лаваш', k:['лаваш'], kcal:277, p:9 },
+  { n:'Хлеб цельнозерновой', k:['хлеб'], kcal:245, p:8, pc:30 },
+  { n:'Хлебцы', k:['хлебц'], kcal:330, p:10, pc:10 },
+  { n:'Мука пшеничная', k:['мук'], kcal:334, p:10, tb:20 },
+  { n:'Гранола', k:['гранол'], kcal:450, p:10 },
+  // Овощи
+  { n:'Огурец', k:['огур'], kcal:15, p:0.8, pc:120 },
+  { n:'Помидор', k:['помид'], kcal:20, p:1.1, pc:120 },
+  { n:'Помидоры черри', k:['черри'], kcal:20, p:1.1, pc:15 },
+  { n:'Капуста белокочанная', k:['капуст'], kcal:27, p:1.8 },
+  { n:'Капуста тушёная', k:['капуст','туш'], kcal:75, p:2 },
+  { n:'Морковь', k:['морков'], kcal:32, p:1.3, pc:80 },
+  { n:'Морковь тушёная', k:['морков','туш'], kcal:45, p:1.3 },
+  { n:'Листья салата', k:['лист'], kcal:14, p:1.2 },
+  { n:'Перец болгарский', k:['перец'], kcal:26, p:1.3, pc:150 },
+  { n:'Брокколи', k:['брокк'], kcal:34, p:2.8 },
+  { n:'Кабачок', k:['кабач'], kcal:24, p:0.6 },
+  { n:'Шампиньоны', k:['шампин'], kcal:27, p:4.3 },
+  { n:'Грибы', k:['гриб'], kcal:27, p:4 },
+  { n:'Лук', k:['лук'], kcal:41, p:1.4, pc:80 },
+  { n:'Авокадо', k:['авокад'], kcal:160, p:2, pc:140 },
+  { n:'Маслины', k:['маслин'], kcal:115, p:0.8, pc:4 },
+  { n:'Оливки', k:['оливк'], kcal:115, p:0.8, pc:4 },
+  { n:'Масло оливковое', k:['масл'], kcal:898, p:0, tb:17 },
+  { n:'Масло оливковое', k:['олив','масл'], kcal:898, p:0, tb:17 },
+  // Фрукты, ягоды
+  { n:'Банан', k:['банан'], kcal:96, p:1.5, pc:120 },
+  { n:'Яблоко', k:['яблок'], kcal:47, p:0.4, pc:150 },
+  { n:'Груша', k:['груш'], kcal:47, p:0.4, pc:150 },
+  { n:'Апельсин', k:['апельсин'], kcal:43, p:0.9, pc:150 },
+  { n:'Мандарин', k:['мандарин'], kcal:38, p:0.8, pc:70 },
+  { n:'Клубника', k:['клубн'], kcal:41, p:0.8 },
+  { n:'Черника', k:['черник'], kcal:44, p:1.1 },
+  { n:'Малина', k:['малин'], kcal:46, p:0.8 },
+  { n:'Ягоды', k:['ягод'], kcal:43, p:0.8 },
+  { n:'Виноград', k:['виноград'], kcal:72, p:0.6 },
+  // Орехи, сладкое
+  { n:'Грецкие орехи', k:['грецк'], kcal:654, p:15.2 },
+  { n:'Орехи (смесь)', k:['орех'], kcal:620, p:17 },
+  { n:'Миндаль', k:['миндал'], kcal:609, p:18.6 },
+  { n:'Кешью', k:['кешью'], kcal:600, p:18 },
+  { n:'Арахис', k:['арахис'], kcal:551, p:26 },
+  { n:'Арахисовая паста', k:['арахис','паст'], kcal:588, p:25, tb:16 },
+  { n:'Тёмный шоколад 85%', k:['шоколад'], kcal:580, p:10, pc:5 },
+  { n:'Мёд', k:['мед'], kcal:329, p:0.8, tb:20 },
+  { n:'Сахар', k:['сахар'], kcal:399, p:0, tb:15 },
+  // Напитки, прочее
+  { n:'Кофе чёрный', k:['коф'], kcal:2, p:0.2, pc:200 },
+  { n:'Капучино', k:['капуч'], kcal:45, p:2.5, pc:250 },
+  { n:'Хумус', k:['хумус'], kcal:166, p:8, tb:25 },
+  { n:'Протеин (порошок)', k:['протеин'], kcal:380, p:75, pc:30 },
+];
+
+function norm(s) { return String(s||'').toLowerCase().replace(/ё/g,'е'); }
+function allProducts() { return [...(db.myProducts||[]), ...PRODUCTS]; }
+function findProduct(text) {
+  const t = norm(text);
+  let best = null, bestScore = 0;
+  allProducts().forEach(pr => {
+    const keys = pr.k || [norm(pr.n)];
+    if (keys.every(k => t.includes(k))) {
+      const score = keys.reduce((s,k) => s + k.length, 0) + (pr.mine ? 100 : 0);
+      if (score > bestScore) { best = pr; bestScore = score; }
+    }
+  });
+  return best;
+}
+// «гречка варёная 60 г, 2 яйца, арахисовая паста 1 ст.л.» → [{text, product, grams, cal, protein}]
+function parseFoodText(text) {
+  return String(text||'').split(/[,;\n]|\s\+\s/).map(s => s.trim()).filter(Boolean).map(part => {
+    const t = norm(part);
+    const numM = t.match(/(\d+(?:[.,]\d+)?)\s*(кг|г|гр|грамм\w*|мл|л|шт\w*|ст\.?\s*л\w*|ч\.?\s*л\w*|ложк\w*)?(?![а-я])/);
+    const namePart = numM ? t.replace(numM[0], ' ') : t;
+    const product = findProduct(namePart);
+    if (!product) return { text: part, product: null };
+    let grams;
+    const n = numM ? parseFloat(numM[1].replace(',', '.')) : null;
+    const unit = numM ? (numM[2] || '') : '';
+    if (n == null) grams = product.pc || 100;
+    else if (/^кг/.test(unit)) grams = n * 1000;
+    else if (/^л$/.test(unit)) grams = n * 1000;
+    else if (/^(г|гр|грамм|мл)/.test(unit)) grams = n;
+    else if (/^шт/.test(unit)) grams = n * (product.pc || 100);
+    else if (/^ст/.test(unit) || /^ложк/.test(unit)) grams = n * (product.tb || 15);
+    else if (/^ч/.test(unit)) grams = n * Math.round((product.tb || 15) / 3);
+    else grams = (product.pc && n <= 12) ? n * product.pc : n;   // «2 яйца» = штуки, «60 гречка» = граммы
+    return { text: part, product, grams: Math.round(grams),
+             cal: Math.round(product.kcal * grams / 100), protein: r1(product.p * grams / 100) };
+  });
+}
+
+// ---------- Каталог готовых блюд ----------
+// Блюда из «Мой рацион» (9 дней, КБЖУ уже посчитаны)
+const RATION_DISHES = [
+  { cat:'Завтрак', name:'Омлет из 3 яиц + сыр 30 г + помидор', cal:420, protein:28 },
+  { cat:'Завтрак', name:'Киноа на молоке + банан + грецкие орехи 15 г', cal:450, protein:18 },
+  { cat:'Завтрак', name:'Киноа на молоке + клубника + орехи 15 г', cal:450, protein:18 },
+  { cat:'Завтрак', name:'Бутерброд с красной рыбой 70 г на лепёшке + греческий йогурт', cal:400, protein:30 },
+  { cat:'Завтрак', name:'Сырники без сахара (200 г творога + 1 яйцо + 2 ст.л. муки) + ягоды + йогурт 100 г', cal:380, protein:28 },
+  { cat:'Завтрак', name:'Лепёшка + арахисовая паста 2 ст.л. + ягоды + йогурт 100 г', cal:390, protein:20 },
+  { cat:'Завтрак', name:'Картофельные вафли (2 картофелины + 1 яйцо) + йогурт 100 г + ягоды', cal:450, protein:18 },
+  { cat:'Обед', name:'Гречка + индейка 150 г + капуста с морковью', cal:560, protein:46 },
+  { cat:'Обед', name:'Булгур + куриная грудка 160 г + тушёная морковь', cal:540, protein:48 },
+  { cat:'Обед', name:'Булгур + куриная грудка + свежие овощи', cal:530, protein:46 },
+  { cat:'Обед', name:'Булгур + индейка 150 г + тушёная морковь', cal:540, protein:44 },
+  { cat:'Обед', name:'Гречка + куриная грудка + капуста', cal:530, protein:46 },
+  { cat:'Обед', name:'Гречка + куриные тефтели + морковь', cal:540, protein:44 },
+  { cat:'Обед', name:'Куриная грудка + картофельные вафли + салат', cal:500, protein:44 },
+  { cat:'Перекус', name:'Греческий йогурт 200 г + ягоды', cal:230, protein:18 },
+  { cat:'Перекус', name:'Греческий йогурт 200 г + ягоды + орехи 10 г', cal:240, protein:18 },
+  { cat:'Перекус', name:'Лепёшка + арахисовая паста 1,5 ст.л. + клубника', cal:260, protein:10 },
+  { cat:'Перекус', name:'Лепёшка + красная рыба 60–70 г + огурец', cal:260, protein:22 },
+  { cat:'Перекус', name:'2 варёных яйца + сыр 25 г', cal:220, protein:20 },
+  { cat:'Перекус', name:'2 варёных яйца + огурец', cal:220, protein:14 },
+  { cat:'Перекус', name:'Варёное яйцо + сыр 25 г + огурец', cal:230, protein:16 },
+  { cat:'Перекус', name:'Творожные вафли + йогурт', cal:240, protein:22 },
+  { cat:'Ужин', name:'Греческий салат + 150 г индейки', cal:450, protein:41 },
+  { cat:'Ужин', name:'Омлет из 3 яиц + 120 г креветок', cal:440, protein:46 },
+  { cat:'Ужин', name:'Омлет из 3 яиц + сыр 30 г + овощи', cal:430, protein:28 },
+  { cat:'Ужин', name:'Куриные тефтели + греческий салат', cal:440, protein:40 },
+  { cat:'Ужин', name:'Греческий салат + 150 г креветок + лепёшка', cal:480, protein:42 },
+];
+const DAY_SHORT = { monday:'Пн', tuesday:'Вт', wednesday:'Ср', thursday:'Чт', friday:'Пт', saturday:'Сб', sunday:'Вс' };
+function catalog() {
+  const list = [], seen = new Set();
+  const add = (d) => { const key = norm(d.name); if (seen.has(key)) return; seen.add(key); list.push(d); };
+  (db.myDishes||[]).forEach(d => add({ ...d, src: '⭐ Моё' }));
+  const cur = getMenuIndexForDate(today());
+  [cur, (cur+1)%3, (cur+2)%3].forEach(mi => days.forEach(k => (MENUS[mi][k]?.meals||[]).forEach(m =>
+    add({ cat: mealCategory(m.name), name: m.name, cal: m.cal||0, protein: m.protein||0, src: `Меню ${mi+1} · ${DAY_SHORT[k]}` }))));
+  RATION_DISHES.forEach(d => add({ ...d, src: 'Рацион 9 дней' }));
+  return list;
+}
+
+// ---------- Отрисовка «Что ела» ----------
+let foodDate = null;
+function renderEaten() {
+  const date = foodDate || today();
+  const meals = dayMeals(date);
+  const e = (db.eaten && db.eaten[date]) || { slots: {}, extras: [] };
+  const t = dayTotals(date);
+  const isTrain = db.workouts.some(w => w.date === date);
+  const norm = isTrain ? (db.settings.train || db.settings.normal) : db.settings.normal;
+
+  document.getElementById('eatKcal').textContent = t.kcal;
+  document.getElementById('eatKcalNorm').textContent = norm + (isTrain ? ' (тренировка)' : '');
+  document.getElementById('eatProtein').textContent = `${t.protein} / ${db.settings.protein} г белка`;
+  const pct = norm ? t.kcal / norm * 100 : 0;
+  const bar = document.getElementById('eatBar');
+  bar.style.width = Math.min(100, pct) + '%';
+  bar.parentElement.classList.toggle('over', t.kcal > norm * 1.05);
+  const left = norm - t.kcal;
+  const tol = norm * 0.05;   // ±5% — это «в норме»
+  document.getElementById('eatLeft').textContent =
+    (left > tol ? `Осталось ${left} ккал` : left >= -tol ? 'В норме 👍' : `Больше нормы на ${-left} ккал`)
+    + (t.changed ? '' : ' · день как в плане');
+
+  document.getElementById('eatSlots').innerHTML = meals.map((m, i) => {
+    const d = splitDishName(m.skip ? m.plan.name : m.name);
+    return `<div class="slot" onclick="openPicker(${i})">
+      <div class="slot-main">
+        <div class="slot-label">${m.cat}${m.custom ? '<span class="tag">замена</span>' : ''}${m.skip ? '<span class="tag">не ела</span>' : ''}</div>
+        <div class="slot-name ${m.skip ? 'skip' : ''}">${esc(d.title)}</div>
+      </div>
+      <div class="slot-kcal">${m.cal}<small>${r1(m.protein)} г б.</small></div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('eatExtras').innerHTML = (e.extras||[]).map((x, i) => `
+    <div class="slot" style="cursor:default;">
+      <div class="slot-main">
+        <div class="slot-label">Ещё</div>
+        <div class="slot-name">${esc(splitDishName(x.name).title)}</div>
+      </div>
+      <div class="slot-kcal">${x.cal}<small>${r1(x.protein)} г б.</small></div>
+      <button class="slot-x" onclick="removeExtra(${i})">✕</button>
+    </div>`).join('');
+
+  // Вода за выбранный день
+  const cnt = (db.waterLog||[]).filter(ts => localDate(new Date(ts)) === date).length;
+  document.getElementById('waterCount').textContent = cnt;
+  document.getElementById('waterWord').textContent = plural(cnt, 'стакан', 'стакана', 'стаканов');
+  document.getElementById('waterRow').style.display = date === today() ? 'flex' : 'none';
+}
+function plural(n, one, few, many) {
+  const a = n % 10, b = n % 100;
+  if (a === 1 && b !== 11) return one;
+  if (a >= 2 && a <= 4 && (b < 10 || b >= 20)) return few;
+  return many;
+}
+function removeExtra(i) {
+  const date = foodDate || today();
+  eatenFor(date).extras.splice(i, 1);
+  syncFoodDay(date); save();
+}
+
+// ---------- Панель выбора ----------
+let pickerSlot = null;   // номер приёма или 'extra'
+function openPicker(slot) {
+  pickerSlot = slot;
+  const date = foodDate || today();
+  const meals = dayMeals(date);
+  document.getElementById('pickerTitle').textContent =
+    slot === 'extra' ? 'Что ещё съела?' : meals[slot].cat + ' — что ела?';
+  document.getElementById('pickerInput').value = '';
+  const acts = [];
+  if (slot !== 'extra') {
+    const m = meals[slot];
+    if (m.custom || m.skip) acts.push(`<button class="secondary small-btn" onclick="resetSlot()">↩ Как в плане</button>`);
+    if (!m.skip) acts.push(`<button class="secondary small-btn" onclick="skipSlot()">Не ела</button>`);
   }
-  let idx = db.food.findIndex(x => x.date === date);
-  const item = { date, status: selectedFood, protein, kcal };
-  if (idx>=0) db.food[idx]=item; else db.food.push(item);
+  document.getElementById('pickerActions').innerHTML = acts.join('');
+  renderPicker();
+  document.getElementById('picker').classList.add('open');
+  document.getElementById('pickerBg').classList.add('open');
+  document.getElementById('picker').scrollTop = 0;
+}
+function closePicker() {
+  document.getElementById('picker').classList.remove('open');
+  document.getElementById('pickerBg').classList.remove('open');
+}
+function renderPicker() {
+  const q = document.getElementById('pickerInput').value.trim();
+  const date = foodDate || today();
+
+  // 1) Подсчёт по продуктам, если в строке есть число или продукт узнаётся
+  const calcEl = document.getElementById('pickerCalc');
+  const parts = q ? parseFoodText(q) : [];
+  const found = parts.filter(p => p.product);
+  const catHit = q && catalog().some(d => norm(d.name).includes(norm(q)));
+  if (q && found.length && (/\d/.test(q) || parts.length > 1 || !catHit)) {
+    const kcal = found.reduce((s,p) => s + p.cal, 0);
+    const prot = r1(found.reduce((s,p) => s + p.protein, 0));
+    calcEl.innerHTML = `<div class="calc-box">
+      ${parts.map(p => p.product
+        ? `${esc(p.product.n)}, ${p.grams} г — <b>${p.cal} ккал</b>, ${p.protein} г белка`
+        : `<span class="miss">«${esc(p.text)}» — не знаю такой продукт</span> <button class="secondary small-btn" onclick="addMyProduct(${JSON.stringify(esc(p.text)).replace(/"/g,'&quot;')})">добавить</button>`
+      ).join('<br>')}
+      <div style="margin-top:6px;"><b>Итого: ${kcal} ккал · ${prot} г белка</b></div>
+      <div class="btns">
+        <button class="small-btn" onclick="applyCalc(false)">Записать</button>
+        <button class="secondary small-btn" onclick="applyCalc(true)">Записать и запомнить блюдо</button>
+      </div>
+    </div>`;
+  } else if (q && /\d/.test(q) && !found.length) {
+    calcEl.innerHTML = `<div class="calc-box"><span class="miss">Не узнала продукт.</span> Напиши, например: «гречка 150 г» или «2 яйца».
+      <div class="btns"><button class="secondary small-btn" onclick="addMyProduct(${JSON.stringify(esc(q.replace(/\d.*$/,'').trim())).replace(/"/g,'&quot;')})">Добавить свой продукт</button></div></div>`;
+  } else calcEl.innerHTML = '';
+
+  // 2) Готовые блюда: сначала подходящие к этому приёму
+  const cat = pickerSlot === 'extra' ? null : dayMeals(date)[pickerSlot].cat;
+  const words = norm(q).replace(/[\d.,]+\s*(г|гр|мл|шт)?/g, ' ').split(/\s+/).filter(w => w.length > 1);
+  let list = catalog().filter(d => words.every(w => norm(d.name).includes(w.slice(0, Math.max(3, w.length - 2)))));
+  const html = [];
+  const block = (title, items) => {
+    if (!items.length) return;
+    html.push(`<div class="group-title">${title}</div>`);
+    items.forEach(d => {
+      const i = CAT_CACHE.push(d) - 1;
+      const sp = splitDishName(d.name);
+      html.push(`<div class="dish" onclick="pickDish(${i})">
+        <div class="dish-main"><div class="dish-name">${esc(sp.title)}</div>
+          <div class="dish-sub">${sp.details ? esc(sp.details) + ' · ' : ''}${esc(d.src)}</div></div>
+        <div class="dish-kcal">${d.cal}<small>${r1(d.protein)} г б.</small></div>
+      </div>`);
+    });
+  };
+  CAT_CACHE = [];
+  if (cat) {
+    block(cat, list.filter(d => d.cat === cat));
+    block('Другое', list.filter(d => d.cat !== cat));
+  } else block('Готовые блюда', list);
+  if (!list.length && !calcEl.innerHTML) html.push('<p class="hint" style="margin-top:12px;">Ничего не нашлось. Можно написать продукты с граммами — посчитаю.</p>');
+  document.getElementById('pickerList').innerHTML = html.join('');
+}
+let CAT_CACHE = [];
+
+function recordMeal(item) {
+  const date = foodDate || today();
+  const e = eatenFor(date);
+  if (pickerSlot === 'extra') e.extras.push(item);
+  else e.slots[pickerSlot] = item;
+  syncFoodDay(date);
+  closePicker();
   save();
 }
+function pickDish(i) {
+  const d = CAT_CACHE[i];
+  recordMeal({ name: d.name, cal: d.cal, protein: d.protein });
+}
+function applyCalc(remember) {
+  const q = document.getElementById('pickerInput').value.trim();
+  const found = parseFoodText(q).filter(p => p.product);
+  if (!found.length) return;
+  const name = found.map(p => `${p.product.n.toLowerCase()} ${p.grams} г`).join(' + ');
+  const item = { name: name[0].toUpperCase() + name.slice(1),
+    cal: found.reduce((s,p) => s + p.cal, 0), protein: r1(found.reduce((s,p) => s + p.protein, 0)) };
+  if (remember) {
+    const title = prompt('Как назвать блюдо?', item.name);
+    if (title === null) return;
+    const cat = pickerSlot === 'extra' ? 'Перекус' : dayMeals(foodDate || today())[pickerSlot].cat;
+    if (!db.myDishes) db.myDishes = [];
+    const full = title.trim() && title.trim() !== item.name ? `${title.trim()} — ${item.name}` : item.name;
+    db.myDishes.push({ cat, name: full, cal: item.cal, protein: item.protein });
+    item.name = full;
+  }
+  recordMeal(item);
+}
+function resetSlot() {
+  const date = foodDate || today();
+  delete eatenFor(date).slots[pickerSlot];
+  syncFoodDay(date); closePicker(); save();
+}
+function skipSlot() {
+  const date = foodDate || today();
+  eatenFor(date).slots[pickerSlot] = 'skip';
+  syncFoodDay(date); closePicker(); save();
+}
+function addMyProduct(name) {
+  name = prompt('Название продукта', name || '');
+  if (!name) return;
+  const kcal = parseFloat(String(prompt('Сколько ккал в 100 г? (есть на упаковке)', '') || '').replace(',', '.'));
+  if (!(kcal >= 0)) return;
+  const p = parseFloat(String(prompt('Сколько белка в 100 г, г?', '0') || '0').replace(',', '.')) || 0;
+  if (!db.myProducts) db.myProducts = [];
+  const key = norm(name).split(/\s+/).filter(w => w.length > 2).map(w => w.slice(0, Math.max(3, w.length - 2)));
+  db.myProducts.push({ n: name.trim(), k: key.length ? key : [norm(name)], kcal, p, mine: true });
+  save();
+  renderPicker();
+}
+
 // Дозаполняет пропущенные дни как "по плану", чтобы не нужно было нажимать вручную каждый день
 function backfillFoodLog() {
   const t = today();
@@ -851,7 +1359,7 @@ function backfillFoodLog() {
     const endDate = new Date(t + 'T00:00:00');
     const existing = new Set(db.food.map(f => f.date));
     while (d <= endDate) {
-      const ds = d.toISOString().slice(0,10);
+      const ds = localDate(d);
       if (!existing.has(ds)) {
         const tt = planTotalsForDate(ds);
         db.food.push({ date: ds, status: 'yes', protein: tt.protein, kcal: tt.kcal });
@@ -925,7 +1433,7 @@ function renderShoppingList() {
 }
 function renderPrepTonight() {
   const t = new Date(); t.setDate(t.getDate() + 1);
-  const tomorrowStr = t.toISOString().slice(0,10);
+  const tomorrowStr = localDate(t);
   const idx = getMenuIndexForDate(tomorrowStr);
   const key = weekdayKeyFromDate(tomorrowStr);
   const prep = PREP_LIST_BY_MENU[idx][key] || {};
@@ -1001,6 +1509,7 @@ function saveSettings() {
   alert('✅ Сохранено');
 }
 function exportData() {
+  if (IN_APP) { toApp('export', { json: JSON.stringify(db, null, 2) }); return; }
   const b = new Blob([JSON.stringify(db, null, 2)], {type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(b);
@@ -1038,10 +1547,19 @@ function resetAll() {
 function toggleWater() {
   db.settings.waterEnabled = document.getElementById('waterEnabled').checked;
   save();
+  syncSettingsToServer();
 }
 function logWater() {
   db.waterLog.push(new Date().toISOString());
   db.settings.waterHours = parseInt(document.getElementById('waterHours').value) || 2;
+  save();
+  syncSettingsToServer();
+}
+function undoWater() {
+  const t = today();
+  for (let i = db.waterLog.length - 1; i >= 0; i--) {
+    if (localDate(new Date(db.waterLog[i])) === t) { db.waterLog.splice(i, 1); break; }
+  }
   save();
   syncSettingsToServer();
 }
@@ -1104,20 +1622,26 @@ async function enableNotifications() {
     document.getElementById('pushStatus').textContent = '❌ Не получилось: ' + e.message;
   }
 }
+function reminderPayload() {
+  return {
+    waterEnabled: !!db.settings.waterEnabled,
+    waterHours: db.settings.waterHours,
+    lastWaterLog: db.waterLog.length ? db.waterLog[db.waterLog.length-1] : null,
+    weightDays: db.settings.weightDays,
+    measureDays: db.settings.measureDays,
+    lastWeightLog: sorted(db.measure.filter(x=>x.weight))[0]?.date || null,
+    lastMeasureLog: sorted(db.measure.filter(x => x.waist || x.hips || x.belly))[0]?.date || null,
+    customReminders: db.customReminders || []
+  };
+}
 async function syncSettingsToServer() {
+  // В приложении Android напоминания ставит сам телефон — сервер не нужен
+  if (IN_APP) { toApp('reminders', reminderPayload()); return; }
   if (!db.settings.pushEnabled || !db.settings.pushServerUrl) return;
   try {
     await fetch(db.settings.pushServerUrl + '/api/settings', {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        waterHours: db.settings.waterHours,
-        lastWaterLog: db.waterLog.length ? db.waterLog[db.waterLog.length-1] : null,
-        weightDays: db.settings.weightDays,
-        measureDays: db.settings.measureDays,
-        lastWeightLog: sorted(db.measure.filter(x=>x.weight))[0]?.date || null,
-        lastMeasureLog: sorted(db.measure)[0]?.date || null,
-        customReminders: db.customReminders || []
-      })
+      body: JSON.stringify(reminderPayload())
     });
   } catch(e) { console.error('Sync error', e); }
 }
@@ -1203,22 +1727,27 @@ function renderMetricChart() {
 // ============================================================
 // НАПОМИНАНИЯ
 // ============================================================
-function nextReminder(k) {
-  const arr = db.measure.filter(x => k==='weight' ? x.weight : (x.waist || x.hips || x.belly));
-  const last = arr.length ? new Date(arr[0].date) : new Date();
+// Дата следующего взвешивания/замера (YYYY-MM-DD).
+// Раньше брался самый СТАРЫЙ замер вместо последнего, а дата сравнивалась в разных форматах,
+// поэтому жёлтый баннер «Сегодня взвешивание» не появлялся никогда.
+function nextReminderDate(k) {
+  const arr = sorted(db.measure.filter(x => k==='weight' ? x.weight : (x.waist || x.hips || x.belly)));
+  const last = arr.length ? new Date(arr[0].date + 'T00:00:00') : new Date();
   const daysN = k==='weight' ? db.settings.weightDays : db.settings.measureDays;
   const next = new Date(last);
   next.setDate(next.getDate() + daysN);
-  return next.toLocaleDateString('ru-RU');
+  return localDate(next);
+}
+function nextReminder(k) {
+  const [y,m,d] = nextReminderDate(k).split('-');
+  return `${d}.${m}.${y}`;
 }
 function checkReminders() {
   const banner = document.getElementById('reminderBanner');
   const todayStr = today();
-  const nextWeight = nextReminder('weight');
-  const nextMeasure = nextReminder('measure');
   let msg = '';
-  if (nextWeight === todayStr) msg += '📢 Сегодня взвешивание! ';
-  if (nextMeasure === todayStr) msg += '📏 Сегодня замеры! ';
+  if (nextReminderDate('weight') <= todayStr) msg += '📢 Сегодня взвешивание! ';
+  if (nextReminderDate('measure') <= todayStr) msg += '📏 Сегодня замеры! ';
   if (checkWaterDue()) msg += '💧 Пора попить воды! ';
   (db.customReminders||[]).forEach(r => {
     if (isCustomReminderDue(r)) msg += `💊 ${r.name}! `;
@@ -1339,6 +1868,7 @@ function render() {
 
   const t = today();
   const tw = db.workouts.filter(x => x.date === t);
+  syncFoodDay(t);   // сегодняшний итог всегда по актуальному выбору блюд
   const tf = db.food.find(x => x.date === t);
   document.getElementById('homeWorkout').textContent = tw.length ? '✓ '+tw.length : '—';
   document.getElementById('homeFood').textContent = tf ? ({yes:'✓', changed:'↗', off:'—'}[tf.status]) : '—';
@@ -1360,7 +1890,7 @@ function render() {
 
   const wl = document.getElementById('workoutList');
   if (db.workouts.length) {
-    wl.innerHTML = sorted(db.workouts).map((x, idx) => `
+    wl.innerHTML = db.workouts.map((x, idx) => ({x, idx})).sort((a,b) => b.x.date.localeCompare(a.x.date)).map(({x, idx}) => `
       <div class="item">
         <div class="itemhead"><b>${esc(x.type)}</b><span class="pill">${x.date}</span></div>
         <div class="muted">${x.duration?x.duration+' мин':''} · ${esc(x.feel)}</div>
@@ -1376,7 +1906,7 @@ function render() {
 
   const ml = document.getElementById('measureList');
   if (db.measure.length) {
-    ml.innerHTML = sorted(db.measure).map((x, idx) => `
+    ml.innerHTML = db.measure.map((x, idx) => ({x, idx})).sort((a,b) => b.x.date.localeCompare(a.x.date)).map(({x, idx}) => `
       <div class="item">
         <div class="itemhead"><b>${x.date}</b><span class="pill">${x.weight ? x.weight+' кг' : ''}</span></div>
         <div class="muted">${x.waist?'Талия '+x.waist+' см':''} ${x.hips?'Бёдра '+x.hips+' см':''} ${x.belly?'Живот '+x.belly+' см':''}</div>
@@ -1390,7 +1920,7 @@ function render() {
     ml.innerHTML = '<div class="empty">Нет замеров</div>';
   }
 
-  const lastAll = db.measure.length ? db.measure[0] : null;
+  const lastAll = db.measure.length ? sorted(db.measure)[0] : null;
   document.getElementById('metrics').innerHTML = `
     <div class="stat metric"><span class="muted">Вес</span><b>${lastAll?.weight||'—'}</b><span class="small">${lastAll?.weight?' кг':''}</span></div>
     <div class="stat metric"><span class="muted">Талия</span><b>${lastAll?.waist||'—'}</b><span class="small">${lastAll?.waist?' см':''}</span></div>
@@ -1432,25 +1962,30 @@ function render() {
   renderPrepTonight();
 
   document.getElementById('wDate').value = t;
-  document.getElementById('fDate').value = t;
+  if (!foodDate) foodDate = t;
+  document.getElementById('fDate').value = foodDate;
   document.getElementById('mDate').value = t;
-  if (tf) { selectedFood = tf.status; highlightFoodStatus(tf.status); } else { selectedFood = 'yes'; highlightFoodStatus('yes'); }
-  updateFoodAutoInfo();
+  renderEaten();
 }
 
 function calcStreak() {
   const days = new Set(db.workouts.map(x => x.date));
   let d = new Date(), n = 0;
-  while (days.has(d.toISOString().slice(0,10))) { n++; d.setDate(d.getDate()-1); }
+  while (days.has(localDate(d))) { n++; d.setDate(d.getDate()-1); }
   return n;
 }
 
 // ============================================================
 // ИНИЦИАЛИЗАЦИЯ
 // ============================================================
-document.getElementById('foodYes').classList.add('selected');
 backfillFoodLog();
 render();
+if (IN_APP) {
+  // Блок про сервер push в приложении не нужен
+  document.getElementById('pushToggle').style.display = 'none';
+  document.getElementById('pushContent').style.display = 'none';
+  syncSettingsToServer();
+}
 </script>
 </body>
 </html>
