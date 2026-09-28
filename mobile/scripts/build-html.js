@@ -5,7 +5,17 @@ const fs = require('fs');
 const path = require('path');
 
 const root = path.join(__dirname, '..', '..');
-let html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const src = path.join(root, 'index.html');
+if (!fs.existsSync(src)) {
+  // Сборка из одной папки mobile (без корня репозитория): берём уже готовый app-html.js
+  if (fs.existsSync(path.join(__dirname, '..', 'app-html.js'))) {
+    console.log('index.html рядом нет — оставляю готовый app-html.js');
+    process.exit(0);
+  }
+  console.error('Не найден ни ../index.html, ни app-html.js');
+  process.exit(1);
+}
+let html = fs.readFileSync(src, 'utf8');
 
 html = html.replace(/(src|href)="([\w.-]+\.png)"/g, (m, attr, file) => {
   const p = path.join(root, file);
