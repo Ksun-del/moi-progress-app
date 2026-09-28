@@ -1,143 +1,122 @@
-// Приложение «Мой прогресс» для Android.
-// Внутри — та же страница index.html, что и на сайте (упакована в app-html.js).
-// Приложение добавляет:
-//   • надёжное хранение данных в памяти телефона (AsyncStorage);
-//   • напоминания прямо с телефона — без сервера на Render;
-//   • экспорт резервной копии через «Поделиться»;
-//   • кнопку «Назад».
+// «Мой прогресс» — приложение для Android.
+// Три экрана (Сегодня / Еда / Прогресс) + настройки. Тренировки подтягиваются с часов через Health Connect,
+// напоминания ставит сам телефон, данные хранятся в памяти телефона.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BackHandler, Platform, StyleSheet, View } from 'react-native';
+import { AppState, BackHandler, Pressable, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { WebView } from 'react-native-webview';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Notifications from 'expo-notifications';
-import * as Sharing from 'expo-sharing';
-import { File, Paths } from 'expo-file-system';
-
-import APP_HTML from './app-html';
-import { planReminders } from './reminders';
-
-const DATA_KEY = 'myProgressV2';
-const CHANNEL_ID = 'reminders';
-
-// Уведомления показываем и когда приложение открыто
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
-
-async function setupNotifications() {
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
-      name: 'Напоминания',
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 250, 250, 250],
-    });
-  }
-  const current = await Notifications.getPermissionsAsync();
-  if (!current.granted) await Notifications.requestPermissionsAsync();
-}
-
-// Полностью пересобираем расписание при каждом изменении настроек/отметок
-async function scheduleReminders(settings) {
-  await Notifications.cancelAllScheduledNotificationsAsync();
-  const plan = planReminders(settings);
-  for (const r of plan) {
-    const content = { title: r.title, body: r.body, sound: 'default' };
-    const trigger = r.kind === 'daily'
-      ? { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour: r.hour, minute: r.minute, channelId: CHANNEL_ID }
-      : { type: Notifications.SchedulableTriggerInputTypes.DATE, date: r.at, channelId: CHANNEL_ID };
-    try {
-      await Notifications.scheduleNotificationAsync({ content, trigger });
-    } catch (e) {
-      console.warn('Не удалось поставить напоминание', r.title, e);
-    }
-  }
-}
-
-async function shareBackup(json) {
-  const d = new Date();
-  const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  const file = new File(Paths.cache, `moi-progress-${stamp}.json`);
-  if (file.exists) file.delete();
-  file.create();
-  file.write(json);
-  await Sharing.shareAsync(file.uri, { mimeType: 'application/json', dialogTitle: 'Сохранить резервную копию' });
-}
+import { useFonts, Onest_400Regular, Onest_500Medium, Onest_600SemiBold, Onest_700Bold, Onest_800ExtraBold } from '@expo-google-fonts/onest';
+import { StoreProvider, useStore } from './src/store';
+import { C } from './src/theme';
+import { Icon, T } from './src/ui';
+import TodayScreen from './src/screens/TodayScreen';
+import FoodScreen from './src/screens/FoodScreen';
+import ProgressScreen from './src/screens/ProgressScreen';
+import SettingsScreen from './src/screens/SettingsScreen';
+import { setupNotifications, scheduleReminders } from './src/logic/notify';
+import * as Health from './src/logic/health';
+import { mergeWatchWorkouts } from './src/logic/core';
 
 export default function App() {
-  const webRef = useRef(null);
-  // undefined — ещё читаем память, null — данных нет, строка — сохранённые данные
-  const [saved, setSaved] = useState(undefined);
-
-  useEffect(() => {
-    AsyncStorage.getItem(DATA_KEY).then(setSaved).catch(() => setSaved(null));
-    setupNotifications().catch(() => {});
-  }, []);
-
-  // «Назад»: страница сама решает — закрыть окно, вернуться на Главную или выйти
-  useEffect(() => {
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      webRef.current?.injectJavaScript('window.__onBack && window.__onBack(); true;');
-      return true;
-    });
-    return () => sub.remove();
-  }, []);
-
-  const onMessage = useCallback(async (event) => {
-    let msg;
-    try { msg = JSON.parse(event.nativeEvent.data); } catch { return; }
-    try {
-      if (msg.type === 'save') await AsyncStorage.setItem(DATA_KEY, msg.data.json);
-      else if (msg.type === 'reminders') await scheduleReminders(msg.data);
-      else if (msg.type === 'export') await shareBackup(msg.data.json);
-      else if (msg.type === 'exit') BackHandler.exitApp();
-    } catch (e) {
-      console.warn('Ошибка обработки сообщения', msg.type, e);
-    }
-  }, []);
-
-  if (saved === undefined) return <View style={styles.bg} />;
-
-  // До загрузки страницы: если у WebView данных нет (первый запуск, очистка),
-  // восстанавливаем их из памяти приложения. Если есть — не трогаем, они не старее.
-  const beforeLoad = `
-    try {
-      var saved = ${JSON.stringify(saved)};
-      if (saved && !localStorage.getItem('${DATA_KEY}')) localStorage.setItem('${DATA_KEY}', saved);
-    } catch (e) {}
-    true;
-  `;
-
+  const [fonts] = useFonts({ Onest_400Regular, Onest_500Medium, Onest_600SemiBold, Onest_700Bold, Onest_800ExtraBold });
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={styles.bg} edges={['top', 'bottom']}>
-        <StatusBar style="dark" />
-        <WebView
-          ref={webRef}
-          style={styles.bg}
-          originWhitelist={['*']}
-          source={{ html: APP_HTML, baseUrl: 'https://moi-progress.app/' }}
-          injectedJavaScriptBeforeContentLoaded={beforeLoad}
-          onMessage={onMessage}
-          domStorageEnabled
-          javaScriptEnabled
-          allowFileAccess
-          mediaPlaybackRequiresUserAction={false}
-          setSupportMultipleWindows={false}
-          overScrollMode="never"
-          textZoom={100}
-        />
-      </SafeAreaView>
+      <StoreProvider>
+        {fonts ? <Main /> : <View style={{ flex: 1, backgroundColor: C.bg }} />}
+      </StoreProvider>
     </SafeAreaProvider>
   );
 }
 
-const styles = StyleSheet.create({
-  bg: { flex: 1, backgroundColor: '#ffffff' },
-});
+const TABS = [
+  { key: 'today', title: 'Сегодня', icon: 'today' },
+  { key: 'food', title: 'Еда', icon: 'food' },
+  { key: 'progress', title: 'Прогресс', icon: 'progress' },
+];
+
+function Main() {
+  const { db, update } = useStore();
+  const [tab, setTab] = useState('today');
+  const [settings, setSettings] = useState(false);
+  const [watch, setWatch] = useState('checking'); // checking | off | on | unavailable
+  const [steps, setSteps] = useState(null);
+  const syncing = useRef(false);
+
+  // Данные с часов: тренировки, шаги, вес
+  const sync = useCallback(async () => {
+    if (syncing.current) return;
+    syncing.current = true;
+    try {
+      const s = await Health.status();
+      if (s !== 'ok') { setWatch(s === 'update' ? 'off' : 'unavailable'); return; }
+      if (!(await Health.hasAccess())) { setWatch('off'); return; }
+      setWatch('on');
+      const list = await Health.readWorkouts(14);
+      if (list && list.length) update(d => mergeWatchWorkouts(d, list));
+      setSteps(await Health.readStepsToday());
+      const ws = await Health.readWeights(30);
+      if (ws.length) update(d => {
+        const have = new Set(d.measure.filter(m => m.weight).map(m => m.date));
+        const add = ws.filter(w => !have.has(w.date)).map(w => ({ date: w.date, weight: w.weight, source: 'scale' }));
+        return add.length ? { ...d, measure: [...d.measure, ...add] } : d;
+      });
+    } catch (e) {
+      console.warn('Health Connect', e);
+    } finally { syncing.current = false; }
+  }, [update]);
+
+  const connect = useCallback(async () => {
+    try { if (await Health.connect()) await sync(); else setWatch(w => (w === 'unavailable' ? w : 'off')); }
+    catch (e) { console.warn(e); }
+  }, [sync]);
+
+  useEffect(() => {
+    setupNotifications().catch(() => {});
+    sync();
+    const sub = AppState.addEventListener('change', st => { if (st === 'active') sync(); });
+    return () => sub.remove();
+  }, [sync]);
+
+  // Напоминания пересчитываются при изменении данных (функция сама пропускает, если ничего не поменялось)
+  useEffect(() => { if (db) scheduleReminders(db).catch(() => {}); }, [db]);
+
+  // «Назад» на телефоне: с «Еды»/«Прогресса» — на «Сегодня», с «Сегодня» — выход
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (tab !== 'today') { setTab('today'); return true; }
+      return false;
+    });
+    return () => sub.remove();
+  }, [tab]);
+
+  if (!db) return <View style={{ flex: 1, backgroundColor: C.bg }} />;
+
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top']}>
+      <StatusBar style="dark" />
+      <View style={{ flex: 1 }}>
+        {tab === 'today' ? <TodayScreen onOpenSettings={() => setSettings(true)} onOpenFood={() => setTab('food')} steps={steps} watchState={watch} onConnectWatch={connect} /> : null}
+        {tab === 'food' ? <FoodScreen /> : null}
+        {tab === 'progress' ? <ProgressScreen /> : null}
+      </View>
+      <SafeAreaView edges={['bottom']} style={{ backgroundColor: C.card, borderTopWidth: 1, borderColor: '#ece6dd' }}>
+        <View style={{ height: 72, flexDirection: 'row', alignItems: 'center' }} accessibilityRole="tablist">
+          {TABS.map(t => {
+            const on = t.key === tab;
+            return (
+              <Pressable key={t.key} onPress={() => setTab(t.key)} accessibilityRole="tab" accessibilityState={{ selected: on }}
+                style={{ flex: 1, alignItems: 'center', gap: 4 }}>
+                <View style={{ width: 56, height: 30, borderRadius: 15, backgroundColor: on ? C.accent : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name={t.icon} color={on ? C.ink : C.muted} />
+                </View>
+                <T w={on ? 'b' : 's'} size={12} color={on ? C.ink : C.muted}>{t.title}</T>
+              </Pressable>
+            );
+          })}
+        </View>
+      </SafeAreaView>
+      <SettingsScreen visible={settings} onClose={() => setSettings(false)} watchState={watch}
+        onConnectWatch={connect} onOpenHealth={Health.openSettings} onSync={sync} />
+    </SafeAreaView>
+  );
+}

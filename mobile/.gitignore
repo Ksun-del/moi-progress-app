@@ -40,6 +40,4 @@ yarn-error.*
 /ios
 /android
 
-# Создаётся автоматически из ../index.html (npm install / npm run build-html)
-app-html.js
 package-lock.json
