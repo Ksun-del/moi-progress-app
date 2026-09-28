@@ -20,7 +20,10 @@
         "monochromeImage": "./assets/adaptive-monochrome.png",
         "backgroundColor": "#ffffff"
       },
-      "permissions": ["android.permission.SCHEDULE_EXACT_ALARM", "android.permission.USE_EXACT_ALARM"]
+      "permissions": [
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.USE_EXACT_ALARM"
+      ]
     },
     "plugins": [
       [
@@ -30,6 +33,12 @@
           "color": "#ff6b00"
         }
       ]
-    ]
+    ],
+    "owner": "ksun_del",
+    "extra": {
+      "eas": {
+        "projectId": "d994965b-c7c1-4f5f-9122-2302659012f9"
+      }
+    }
   }
 }
