@@ -1,0 +1,101 @@
+import assert from 'node:assert';
+import * as L from '../src/logic/core.js';
+import { planReminders } from '../src/logic/reminders.js';
+
+const at = (s) => new Date(s);
+const hm = (d) => `${d.getDate()}.${d.getMonth() + 1} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+let n = 0; const ok = (name, fn) => { fn(); n++; console.log('✓', name); };
+
+// ---------- Напоминания ----------
+ok('вода: каждые 2 часа после отметки', () => {
+  const p = planReminders({ waterEnabled: true, waterHours: 2, lastWaterLog: at('2026-09-28T10:00:00').toISOString() }, at('2026-09-28T10:30:00'));
+  assert.deepStrictEqual(p.map(r => hm(r.at)), ['28.9 12:00', '28.9 14:00', '28.9 16:00']);
+});
+ok('вода: ночью не будим', () => {
+  const p = planReminders({ waterEnabled: true, waterHours: 2, lastWaterLog: at('2026-09-28T21:30:00').toISOString() }, at('2026-09-28T21:40:00'));
+  assert.ok(p.every(r => r.at.getHours() >= 8 && r.at.getHours() < 23));
+});
+ok('взвешивание и замеры в 9:00', () => {
+  const p = planReminders({ lastWeightLog: '2026-09-22', weightDays: 7, lastMeasureLog: '2026-09-01', measureDays: 28 }, at('2026-09-28T20:00:00'));
+  assert.deepStrictEqual(p.map(r => hm(r.at)), ['29.9 09:00', '29.9 09:00']);
+});
+
+// ---------- Данные ----------
+const TODAY = '2026-09-28';
+function freshDb() { return L.normalizeDb({ settings: { normal: 1500, protein: 110, exerciseShare: 50 }, measure: [{ date: '2026-09-20', weight: 64 }] }); }
+
+ok('старые данные из версии-сайта читаются', () => {
+  const old = { workouts: [{ date: TODAY, type: 'Бег на улице', duration: '40', feel: 'Отлично' }], food: [], measure: [], settings: { start: 66, target: 58, normal: 1500, train: 1700, protein: 110 }, weekMenu: {}, waterLog: [] };
+  const db = L.normalizeDb(old);
+  assert.equal(db.weekMenu, undefined);
+  assert.equal(db.settings.exerciseShare, 50);
+  assert.equal(L.workoutKind(db.workouts[0]), 'run');
+  assert.ok(L.workoutKcal(db, db.workouts[0]) > 300, 'бег 40 мин оценивается по MET');
+});
+
+ok('сегодня: не отмеченное не считается съеденным, прошедший день — считается по плану', () => {
+  const db = freshDb();
+  assert.equal(L.dayTotals(db, TODAY, TODAY).kcal, 0);
+  const past = L.dayTotals(db, '2026-09-27', TODAY);
+  assert.ok(past.kcal > 1400 && past.kcal < 1600, 'прошедший день ≈ план ' + past.kcal);
+});
+
+ok('отметки: по плану, не ела, замена, ещё', () => {
+  let db = freshDb();
+  const plan = L.planFor(TODAY);
+  db = L.setSlot(db, TODAY, 0, 'plan');
+  db = L.setSlot(db, TODAY, 1, 'skip');
+  db = L.setSlot(db, TODAY, 2, { name: 'Гречка + индейка', cal: 560, protein: 46 });
+  db = L.addExtra(db, TODAY, { name: 'Банан', cal: 115, protein: 1.8 });
+  const t = L.dayTotals(db, TODAY, TODAY);
+  assert.equal(t.kcal, Math.round(plan[0].cal + 560 + 115));
+  assert.equal(t.meals[1].state, 'skip');
+  assert.equal(db.food.find(f => f.date === TODAY).status, 'changed');
+  db = L.removeExtra(db, TODAY, 0);
+  assert.equal(L.dayTotals(db, TODAY, TODAY).extras.length, 0);
+});
+
+ok('норма растёт на половину сожжённого с часов', () => {
+  let db = freshDb();
+  db = L.mergeWatchWorkouts(db, [{ hcId: 'a1', source: 'watch', date: TODAY, kind: 'run', duration: 42, kcal: 380, distanceKm: 5.1 }]);
+  const t = L.dayTarget(db, TODAY);
+  assert.deepStrictEqual([t.burned, t.bonus, t.total], [380, 190, 1690]);
+  // повторная синхронизация не дублирует, а обновляет
+  db = L.mergeWatchWorkouts(db, [{ hcId: 'a1', source: 'watch', date: TODAY, kind: 'run', duration: 42, kcal: 400, distanceKm: 5.1 }]);
+  assert.equal(db.workouts.length, 1);
+  assert.equal(L.dayTarget(db, TODAY).bonus, 200);
+  db = { ...db, settings: { ...db.settings, exerciseShare: 0 } };
+  assert.equal(L.dayTarget(db, TODAY).total, 1500);
+});
+
+ok('подсказка на ужин укладывается в остаток и добирает белок', () => {
+  let db = freshDb();
+  db = L.mergeWatchWorkouts(db, [{ hcId: 'a1', source: 'watch', date: TODAY, kind: 'run', duration: 42, kcal: 380 }]);
+  db = L.setSlot(db, TODAY, 0, 'plan'); db = L.setSlot(db, TODAY, 1, 'plan'); db = L.setSlot(db, TODAY, 2, 'plan');
+  const a = L.dinnerAdvice(db, TODAY);
+  assert.ok(a, 'есть подсказка');
+  assert.ok(a.kcalLeft > 0);
+  assert.ok(a.options.length >= 1, 'есть варианты');
+  for (const o of a.options) { assert.equal(o.cat, 'Ужин'); assert.ok(o.cal <= a.kcalLeft + 40); }
+  console.log('   остаток', a.kcalLeft, 'ккал,', a.proteinLeft, 'г белка →', a.options.map(o => `${L.splitDishName(o.name).title} (${o.cal}/${o.protein})`).join('; '));
+  // ужин отмечен — подсказки нет
+  db = L.setSlot(db, TODAY, 4, 'plan');
+  assert.equal(L.dinnerAdvice(db, TODAY), null);
+});
+
+ok('подсчёт по продуктам', () => {
+  const db = freshDb();
+  const p = L.parseFoodText(db, 'гречка варёная 150 г, 2 яйца, арахисовая паста 1 ст.л., банан');
+  assert.deepStrictEqual(p.map(x => [x.product.n, x.grams]), [['Гречка варёная', 150], ['Яйцо', 110], ['Арахисовая паста', 16], ['Банан', 120]]);
+  assert.equal(L.parseFoodText(db, 'непонятное 50 г')[0].product, null);
+});
+
+ok('вода и неделя', () => {
+  let db = freshDb();
+  db = L.addWater(db); db = L.addWater(db); db = L.undoWater(db);
+  assert.equal(L.waterCount(db, L.today()), 1);
+  const w = L.weekStats(db, TODAY);
+  assert.equal(w.days.length, 7);
+});
+
+console.log(`\nВсе проверки пройдены: ${n} ✓`);
