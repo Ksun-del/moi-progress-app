@@ -2,7 +2,7 @@
   "expo": {
     "name": "Мой прогресс",
     "slug": "moi-progress",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "com.ksundel.moiprogress",
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-foreground.png",
         "monochromeImage": "./assets/adaptive-monochrome.png",

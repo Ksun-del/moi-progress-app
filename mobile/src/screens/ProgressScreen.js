@@ -6,16 +6,17 @@ import { useStore } from '../store';
 import { C } from '../theme';
 import { Btn, Card, Chip, Field, Icon, Progress, Section, Sheet, T } from '../ui';
 import IntervalTimer from '../components/IntervalTimer';
+import WorkoutSheet from '../components/WorkoutSheet';
 import {
-  today, shortDate, sortedMeasures, weekStats, workoutKcal, workoutTitle, workoutKind, WORKOUT_KINDS, DAY_SHORT, fmt, plural,
+  today, shortDate, sortedMeasures, weekStats, workoutKcal, workoutTitle, workoutKind, DAY_SHORT, fmt, plural, removeWorkout,
 } from '../logic/core';
 
-export default function ProgressScreen() {
+export default function ProgressScreen({ watchState }) {
   const { db, update } = useStore();
   const { width } = useWindowDimensions();
   const [weightOpen, setWeightOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [addW, setAddW] = useState(null);
+  const [addW, setAddW] = useState(false);
   const [timerOpen, setTimerOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
 
@@ -82,7 +83,7 @@ export default function ProgressScreen() {
           </View>
         </Card>
 
-        <Section title="Тренировки" action="+ Вручную" onAction={() => setAddW({ kind: 'run', duration: '' })} />
+        <Section title="Тренировки" action="+ Добавить" onAction={() => setAddW(true)} />
         <Card style={{ paddingVertical: 4 }}>
           {workouts.length ? (showAll ? workouts : workouts.slice(0, 5)).map((w, i) => (
             <View key={w.hcId || i} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderTopWidth: i ? 1 : 0, borderColor: C.line }}>
@@ -94,13 +95,11 @@ export default function ProgressScreen() {
                 <T size={13} color={C.muted}>{w.date === today() ? 'Сегодня' : shortDate(w.date)} · {w.duration} мин · {w.source === 'watch' ? 'с часов' : 'вручную'}</T>
               </View>
               <T w="b">{fmt(workoutKcal(db, w))}</T>
-              {w.source !== 'watch' ? (
-                <Pressable hitSlop={10} accessibilityLabel="Удалить тренировку" onPress={() => update(d => ({ ...d, workouts: d.workouts.filter(x => x !== w) }))}>
-                  <Icon name="trash" size={18} color={C.muted} />
-                </Pressable>
-              ) : null}
+              <Pressable hitSlop={10} accessibilityLabel="Удалить тренировку" onPress={() => update(d => removeWorkout(d, w))}>
+                <Icon name="trash" size={18} color={C.muted} />
+              </Pressable>
             </View>
-          )) : <T color={C.muted} style={{ paddingVertical: 14 }}>Тренировок пока нет. С подключёнными часами они появятся сами.</T>}
+          )) : <T color={C.muted} style={{ paddingVertical: 14 }}>Тренировок пока нет. Нажмите «+ Добавить».</T>}
           {workouts.length > 5 && !showAll ? <Btn title="Показать все" kind="clear" small style={{ marginVertical: 10 }} onPress={() => setShowAll(true)} /> : null}
         </Card>
 
@@ -131,26 +130,7 @@ export default function ProgressScreen() {
         )) : <T color={C.muted}>Записей пока нет.</T>}
       </Sheet>
 
-      <Sheet visible={!!addW} onClose={() => setAddW(null)} title="Тренировка вручную">
-        {addW ? (
-          <>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {Object.entries(WORKOUT_KINDS).map(([k, label]) => (
-                <Pressable key={k} onPress={() => setAddW({ ...addW, kind: k })} accessibilityRole="button" accessibilityState={{ selected: addW.kind === k }}
-                  style={{ height: 40, paddingHorizontal: 14, borderRadius: 20, justifyContent: 'center', backgroundColor: addW.kind === k ? C.ink : C.soft }}>
-                  <T w="s" size={14} color={addW.kind === k ? '#fff' : C.ink}>{label}</T>
-                </Pressable>
-              ))}
-            </View>
-            <Field label="Длительность, мин" keyboardType="number-pad" value={addW.duration} onChangeText={v => setAddW({ ...addW, duration: v.replace(/\D/g, '') })} />
-            <Field label="Калории, если знаете (иначе посчитаю сама)" keyboardType="number-pad" value={addW.kcal || ''} onChangeText={v => setAddW({ ...addW, kcal: v.replace(/\D/g, '') })} />
-            <Btn title="Сохранить" disabled={!Number(addW.duration)} onPress={() => {
-              update(d => ({ ...d, workouts: [...d.workouts, { date: today(), kind: addW.kind, duration: Number(addW.duration), kcal: Number(addW.kcal) || 0, source: 'manual' }] }));
-              setAddW(null);
-            }} />
-          </>
-        ) : null}
-      </Sheet>
+      <WorkoutSheet visible={addW} onClose={() => setAddW(false)} watchState={watchState} />
 
       <IntervalTimer visible={timerOpen} onClose={() => setTimerOpen(false)} />
     </View>

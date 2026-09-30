@@ -1,16 +1,27 @@
-// Шторка «Что ела?»: по плану / не ела / другое блюдо / посчитать по продуктам
+// Шторка «Что ела?»: по плану / не ела / собрать «тарелку» из продуктов и блюд
+// Тарелка: добавляешь по одному («гречка 150», потом «курица 120»), всё складывается в одну запись.
 import { useMemo, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable, TextInput, View } from 'react-native';
 import { useStore } from '../store';
-import { C } from '../theme';
-import { Btn, Field, Sheet, T, Icon } from '../ui';
+import { C, F } from '../theme';
+import { Btn, Field, Sheet, T, Icon, Round } from '../ui';
 import {
-  dayMeals, catalog, searchCatalog, parseFoodText, splitDishName, setSlot, addExtra, norm, r1, fmt, dec, forSlot,
+  dayMeals, catalog, searchCatalog, parseFoodText, splitDishName, setSlot, addExtra, norm, r1, fmt, dec, forSlot, plateTotal,
 } from '../logic/core';
+
+// Элемент тарелки: продукт (можно менять граммы) или готовое блюдо
+function fromProduct(p) { return { prod: p.product, grams: p.grams }; }
+function fromDish(d) { return { name: d.name, cal: d.cal, protein: d.protein }; }
+function itemValue(x) {
+  if (!x.prod) return x;
+  const g = Number(x.grams) || 0;
+  return { name: `${x.prod.n} ${g} г`, cal: Math.round(x.prod.kcal * g / 100), protein: r1(x.prod.p * g / 100) };
+}
 
 export default function MealPicker({ date, slot, onClose }) {
   const { db, update } = useStore();
   const [q, setQ] = useState('');
+  const [plate, setPlate] = useState([]);
   const [dishName, setDishName] = useState(null);      // не null — показываем поле «как назвать блюдо»
   const [newProd, setNewProd] = useState(null);         // {n, kcal, p} — форма своего продукта
   const visible = slot !== null && slot !== undefined;
@@ -21,28 +32,25 @@ export default function MealPicker({ date, slot, onClose }) {
   const list = useMemo(() => (db ? catalog(db, date) : []), [db, date]);
   const parts = useMemo(() => (q && db ? parseFoodText(db, q) : []), [q, db]);
   const found = parts.filter(p => p.product);
-  const catHit = q && list.some(d => norm(d.name).includes(norm(q)));
-  const showCalc = q && found.length > 0 && (/\d/.test(q) || parts.length > 1 || !catHit);
   const shown = searchCatalog(list, q);
   const mine = meal ? forSlot(shown, meal) : shown;
   const other = meal ? shown.filter(d => !mine.includes(d)) : [];
+  const values = plate.map(itemValue);
+  const total = plateTotal(values);
 
-  function close() { setQ(''); setDishName(null); setNewProd(null); onClose(); }
+  function close() { setQ(''); setPlate([]); setDishName(null); setNewProd(null); onClose(); }
   function record(item) {
     update(d => (slot === 'extra' ? addExtra(d, date, item) : setSlot(d, date, slot, item)));
     close();
   }
-  function calcItem() {
-    const name = found.map(p => `${p.product.n.toLowerCase()} ${p.grams} г`).join(' + ');
-    return { name: name[0].toUpperCase() + name.slice(1), cal: found.reduce((s, p) => s + p.cal, 0), protein: r1(found.reduce((s, p) => s + p.protein, 0)) };
-  }
+  function addToPlate(items) { setPlate(p => [...p, ...items]); setQ(''); setDishName(null); }
+  function setGrams(i, v) { setPlate(p => p.map((x, j) => (j === i ? { ...x, grams: v.replace(/\D/g, '') } : x))); }
+  function removeItem(i) { setPlate(p => p.filter((_, j) => j !== i)); }
   function saveDish() {
-    const item = calcItem();
-    const title = (dishName || '').trim();
-    const full = title && title !== item.name ? `${title} — ${item.name}` : item.name;
+    const item = plateTotal(values, dishName);
     const c = cat || 'Перекус';
-    update(d => ({ ...d, myDishes: [...(d.myDishes || []), { cat: c, name: full, cal: item.cal, protein: item.protein }] }));
-    record({ ...item, name: full });
+    update(d => ({ ...d, myDishes: [...(d.myDishes || []), { cat: c, name: item.name, cal: item.cal, protein: item.protein }] }));
+    record(item);
   }
   function saveProduct() {
     const kcal = parseFloat(String(newProd.kcal).replace(',', '.'));
@@ -55,9 +63,28 @@ export default function MealPicker({ date, slot, onClose }) {
 
   const title = slot === 'extra' ? 'Что ещё съела?' : `${cat || ''} — что ела?`;
 
+  const footer = plate.length ? (
+    <View style={{ gap: 8, paddingTop: 10, borderTopWidth: 1, borderColor: C.line }}>
+      {dishName === null ? (
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <Btn title={`Записать · ${fmt(total.cal)} ккал`} kind="accent" style={{ flex: 1 }} onPress={() => record(total)} />
+          <Btn title="Запомнить" kind="ghost" onPress={() => setDishName('')} />
+        </View>
+      ) : (
+        <View style={{ gap: 8 }}>
+          <Field label="Как назвать блюдо (появится в списке готовых)" value={dishName} onChangeText={setDishName} placeholder="Например: Гречка с курицей" autoFocus />
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Btn title="Сохранить и записать" kind="accent" style={{ flex: 1 }} onPress={saveDish} />
+            <Btn title="Отмена" kind="clear" onPress={() => setDishName(null)} />
+          </View>
+        </View>
+      )}
+    </View>
+  ) : null;
+
   return (
-    <Sheet visible={visible} onClose={close} title={title}>
-      {meal ? (
+    <Sheet visible={visible} onClose={close} title={title} footer={footer}>
+      {meal && !plate.length ? (
         <View style={{ backgroundColor: C.soft, borderRadius: 20, padding: 16, gap: 10 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
             <T size={13} color={C.muted}>По плану</T>
@@ -74,43 +101,53 @@ export default function MealPicker({ date, slot, onClose }) {
         </View>
       ) : null}
 
-      <T w="b" size={13} color={C.muted} style={{ marginTop: 6 }}>{meal ? 'ИЛИ ДРУГОЕ' : 'НАЙТИ ИЛИ ПОСЧИТАТЬ'}</T>
+      {plate.length ? (
+        <View style={{ backgroundColor: C.warmBg, borderRadius: 20, padding: 16, gap: 4 }}>
+          <T w="b" size={13} color={C.muted}>В ТАРЕЛКЕ</T>
+          {plate.map((x, i) => {
+            const v = values[i];
+            return (
+              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, borderTopWidth: i ? 1 : 0, borderColor: C.warmLine }}>
+                <T w="s" style={{ flex: 1 }}>{x.prod ? x.prod.n : splitDishName(x.name).title}</T>
+                {x.prod ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <TextInput value={String(x.grams)} onChangeText={t => setGrams(i, t)} keyboardType="number-pad" selectTextOnFocus
+                      accessibilityLabel={`Граммы: ${x.prod.n}`}
+                      style={{ width: 58, height: 38, borderRadius: 10, backgroundColor: C.card, textAlign: 'center', fontFamily: F.s, fontSize: 15, color: C.ink, padding: 0 }} />
+                    <T size={13} color={C.muted}>г</T>
+                  </View>
+                ) : null}
+                <T w="b" style={{ minWidth: 44, textAlign: 'right' }}>{v.cal}</T>
+                <Round label="Убрать" size={32} bg={C.card} onPress={() => removeItem(i)}><Icon name="close" size={12} color={C.muted} /></Round>
+              </View>
+            );
+          })}
+          <View style={{ height: 1, backgroundColor: C.warmLine, marginTop: 4 }} />
+          <T w="x" size={16} style={{ paddingTop: 6 }}>Итого: {fmt(total.cal)} ккал · {dec(total.protein)} г белка</T>
+        </View>
+      ) : null}
+
+      <T w="b" size={13} color={C.muted} style={{ marginTop: 6 }}>{plate.length ? 'ДОБАВИТЬ ЕЩЁ' : meal ? 'ИЛИ ДРУГОЕ' : 'НАЙТИ ИЛИ ПОСЧИТАТЬ'}</T>
       <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderRadius: 26, borderWidth: 2, borderColor: C.ink, paddingHorizontal: 16, gap: 8 }}>
         <Icon name="search" color={C.muted} />
-        <Field value={q} onChangeText={t => { setQ(t); setDishName(null); }} placeholder="Блюдо или «гречка 150 г, 2 яйца»"
+        <Field value={q} onChangeText={setQ} placeholder="Продукт или блюдо: «гречка 150»"
           style={{ flex: 1 }} inputStyle={{ backgroundColor: 'transparent', paddingHorizontal: 0 }} autoCorrect={false} />
       </View>
+      {!q && !plate.length ? <T size={13} color={C.muted}>Ела несколько продуктов (гречка + курица)? Добавляйте по одному — всё сложится в одну запись. Граммы можно поправить потом.</T> : null}
 
-      {showCalc ? (
-        <View style={{ backgroundColor: C.warmBg, borderRadius: 20, padding: 16, gap: 8 }}>
+      {q && parts.length ? (
+        <View style={{ backgroundColor: C.soft, borderRadius: 20, padding: 16, gap: 8 }}>
           {parts.map((p, i) => p.product ? (
             <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
               <T style={{ flex: 1 }}>{p.product.n}, {p.grams} г</T><T w="b">{p.cal} ккал</T>
             </View>
           ) : (
             <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-              <T color={C.bad} style={{ flex: 1 }}>«{p.text}» — не знаю</T>
+              <T color={C.muted} style={{ flex: 1 }}>«{p.text}» — нет в базе продуктов</T>
               <Btn title="Добавить продукт" kind="clear" small onPress={() => setNewProd({ n: p.text.replace(/[\d.,]+.*$/, '').trim(), kcal: '', p: '' })} />
             </View>
           ))}
-          <View style={{ height: 1, backgroundColor: C.warmLine }} />
-          <T w="x" size={16}>Итого: {fmt(calcItem().cal)} ккал · {dec(calcItem().protein)} г белка</T>
-          {dishName === null ? (
-            <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-              <Btn title="Записать" small onPress={() => record(calcItem())} />
-              <Btn title="Запомнить как блюдо" kind="clear" small onPress={() => setDishName('')} />
-            </View>
-          ) : (
-            <View style={{ gap: 8 }}>
-              <Field label="Как назвать блюдо" value={dishName} onChangeText={setDishName} placeholder="Например: Мой обед" autoFocus />
-              <Btn title="Сохранить и записать" small onPress={saveDish} />
-            </View>
-          )}
-        </View>
-      ) : q && /\d/.test(q) && !found.length ? (
-        <View style={{ backgroundColor: C.warmBg, borderRadius: 20, padding: 16, gap: 10 }}>
-          <T>Не узнала продукт. Напишите, например: «гречка 150 г» или «2 яйца».</T>
-          <Btn title="Добавить свой продукт" kind="clear" small onPress={() => setNewProd({ n: q.replace(/[\d.,]+.*$/, '').trim(), kcal: '', p: '' })} />
+          {found.length ? <Btn title={found.length > 1 ? `+ Добавить ${found.length} в тарелку` : '+ Добавить в тарелку'} small onPress={() => addToPlate(found.map(fromProduct))} /> : null}
         </View>
       ) : null}
 
@@ -129,9 +166,9 @@ export default function MealPicker({ date, slot, onClose }) {
         </View>
       ) : null}
 
-      <DishList title={cat ? `Готовое: ${cat.toLowerCase()}` : 'Готовые блюда'} items={mine} onPick={d => record({ name: d.name, cal: d.cal, protein: d.protein })} />
-      <DishList title="Другое" items={other} onPick={d => record({ name: d.name, cal: d.cal, protein: d.protein })} />
-      {!shown.length && !showCalc ? <T color={C.muted}>Ничего не нашлось. Можно написать продукты с граммами — посчитаю.</T> : null}
+      <DishList title={cat ? `Готовое: ${cat.toLowerCase()}` : 'Готовые блюда'} items={mine} onPick={d => addToPlate([fromDish(d)])} />
+      <DishList title="Другое" items={other} onPick={d => addToPlate([fromDish(d)])} />
+      {q && !shown.length && !found.length ? <T color={C.muted}>Ничего не нашлось. Напишите продукт с граммами, например «курица 120», или добавьте свой продукт.</T> : null}
     </Sheet>
   );
 }
@@ -144,7 +181,7 @@ function DishList({ title, items, onPick }) {
       {items.map((d, i) => {
         const sp = splitDishName(d.name);
         return (
-          <Pressable key={i} onPress={() => onPick(d)} accessibilityRole="button"
+          <Pressable key={i} onPress={() => onPick(d)} accessibilityRole="button" accessibilityHint="Добавить в тарелку"
             style={({ pressed }) => ({ flexDirection: 'row', gap: 10, paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderColor: C.line, opacity: pressed ? 0.6 : 1 })}>
             <View style={{ flex: 1, gap: 2 }}>
               <T w="s">{sp.title}</T>

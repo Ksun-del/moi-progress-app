@@ -5,14 +5,16 @@ import { useStore } from '../store';
 import { C } from '../theme';
 import { Btn, Card, Chip, Icon, Progress, Ring, Round, Section, T } from '../ui';
 import MealPicker from '../components/MealPicker';
+import WorkoutSheet from '../components/WorkoutSheet';
 import {
   today, humanDate, dayTotals, dayTarget, dinnerAdvice, workoutsOn, workoutKcal, workoutTitle, workoutKind,
-  waterCount, addWater, undoWater, splitDishName, setSlot, removeExtra, fmt, plural, r1, dec,
+  waterCount, addWater, undoWater, removeWorkout, splitDishName, setSlot, removeExtra, fmt, plural, r1, dec,
 } from '../logic/core';
 
 export default function TodayScreen({ onOpenSettings, onOpenFood, steps, watchState, onConnectWatch }) {
   const { db, update } = useStore();
   const [slot, setSlotPick] = useState(null);
+  const [addWorkout, setAddWorkout] = useState(false);
   const date = today();
   const t = dayTotals(db, date);
   const target = dayTarget(db, date);
@@ -78,6 +80,9 @@ export default function TodayScreen({ onOpenSettings, onOpenFood, steps, watchSt
                 <T size={13} color={C.muted}>{w.source === 'watch' ? 'С часов' : 'Вручную'}{w.start ? ' · ' + timeRange(w) : ''}</T>
               </View>
               <Chip text={`+${Math.round(workoutKcal(db, w) * db.settings.exerciseShare / 100 / 10) * 10} к норме`} />
+              <Pressable hitSlop={10} accessibilityLabel="Удалить тренировку" onPress={() => update(d => removeWorkout(d, w))}>
+                <Icon name="trash" size={18} color={C.muted} />
+              </Pressable>
             </View>
             <View style={{ flexDirection: 'row' }}>
               <Stat v={`${w.duration} мин`} l="время" />
@@ -87,10 +92,11 @@ export default function TodayScreen({ onOpenSettings, onOpenFood, steps, watchSt
           </Card>
         ))}
 
+        <Btn title="+ Тренировка" kind="ghost" style={{ marginTop: 12 }} onPress={() => setAddWorkout(true)} />
         {!workouts.length && watchState === 'off' ? (
           <Card style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <Icon name="watch" color={C.run} size={24} />
-            <T style={{ flex: 1 }} size={14}>Подключите часы — тренировки будут появляться здесь сами</T>
+            <T style={{ flex: 1 }} size={14}>Подключите часы — сможете добавлять тренировки с них одной кнопкой</T>
             <Btn title="Подключить" small onPress={onConnectWatch} />
           </Card>
         ) : null}
@@ -154,6 +160,7 @@ export default function TodayScreen({ onOpenSettings, onOpenFood, steps, watchSt
         <Btn title="+ Ещё что-то съела" kind="ghost" style={{ marginTop: 12 }} onPress={() => setSlotPick('extra')} />
       </ScrollView>
       <MealPicker date={date} slot={slot} onClose={() => setSlotPick(null)} />
+      <WorkoutSheet visible={addWorkout} onClose={() => setAddWorkout(false)} watchState={watchState} />
     </View>
   );
 }

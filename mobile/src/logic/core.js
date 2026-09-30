@@ -51,6 +51,11 @@ export function normalizeDb(raw) {
   for (const k of ['workouts', 'food', 'measure', 'waterLog', 'customReminders', 'myDishes', 'myProducts']) if (!Array.isArray(db[k])) db[k] = [];
   if (!db.eaten || typeof db.eaten !== 'object') db.eaten = {};
   delete db.weekMenu;
+  // Версия 1.2: тренировки с часов больше не добавляются сами — убираем ходьбу, что налилась автоматически
+  if (!db.settings.manualWorkouts) {
+    db.workouts = db.workouts.filter(w => !(w.source === 'watch' && w.kind === 'walk'));
+    db.settings.manualWorkouts = true;
+  }
   return db;
 }
 
@@ -193,10 +198,28 @@ export function findProduct(db, text) {
   });
   return best;
 }
+// «лепешка фарш овощи» (без запятых и граммов) → три продукта; «говяжий фарш» остаётся одним
+function scoreOf(db, text) {
+  const pr = findProduct(db, text);
+  return pr ? (pr.k || [norm(pr.n)]).reduce((s, k) => s + k.length, 0) : 0;
+}
+function splitWords(db, part) {
+  if (/\d/.test(part)) return [part];
+  const words = part.split(/\s+/).filter(Boolean);
+  const chunks = [];
+  for (const w of words) {
+    const cur = chunks[chunks.length - 1];
+    if (cur == null) { chunks.push(w); continue; }
+    const merged = cur + ' ' + w;
+    if (scoreOf(db, merged) > Math.max(scoreOf(db, cur), scoreOf(db, w)) || !findProduct(db, w) || !findProduct(db, cur)) chunks[chunks.length - 1] = merged;
+    else chunks.push(w);
+  }
+  return chunks;
+}
 export function parseFoodText(db, text) {
-  return String(text || '').split(/[,;\n]|\s\+\s/).map(s => s.trim()).filter(Boolean).map(part => {
+  return String(text || '').split(/(?<!\d),|,(?!\d)|[;\n]|\s\+\s|\s+и\s+/).map(s => s.trim()).filter(Boolean).flatMap(p => splitWords(db, p)).map(part => {
     const t = norm(part);
-    const numM = t.match(/(\d+(?:[.,]\d+)?)\s*(кг|г|гр|грамм\S*|мл|л|шт\S*|ст\.?\s*л\S*|ч\.?\s*л\S*|ложк\S*)?(?![а-я])/);
+    const numM = t.match(/(\d+(?:[.,]\d+)?)\s*(кг|г|гр|грамм\S*|мл|л|шт\S*|ст\.?\s*л\S*|ч\.?\s*л\S*|ложк\S*)?(?![а-я%\d.,])/);
     const product = findProduct(db, numM ? t.replace(numM[0], ' ') : t);
     if (!product) return { text: part, product: null };
     const n = numM ? parseFloat(numM[1].replace(',', '.')) : null;
@@ -211,6 +234,17 @@ export function parseFoodText(db, text) {
     else grams = (product.pc && n <= 12) ? n * product.pc : n;
     return { text: part, product, grams: Math.round(grams), cal: Math.round(product.kcal * grams / 100), protein: r1(product.p * grams / 100) };
   });
+}
+
+// «Тарелка»: несколько продуктов/блюд в один приём пищи
+export function plateTotal(plate, title = '') {
+  const t0 = String(title || '').trim();
+  if (plate.length === 1 && !t0) return { name: plate[0].name, cal: plate[0].cal || 0, protein: r1(plate[0].protein) };
+  const items = plate.map(x => x.name.replace(/^\s*(Завтрак|Обед|Перекус|Ужин)\s*:\s*/i, '').split(' — ')[0]);
+  let name = items.map((x, i) => (i ? x[0].toLowerCase() + x.slice(1) : x)).join(' + ');
+  const t = String(title || '').trim();
+  if (t && t !== name) name = `${t} — ${name}`;
+  return { name, cal: plate.reduce((s, x) => s + (x.cal || 0), 0), protein: r1(plate.reduce((s, x) => s + (x.protein || 0), 0)) };
 }
 
 // ---------- Изменения данных (возвращают новый db) ----------
@@ -240,8 +274,16 @@ export function undoWater(db) {
   for (let i = log.length - 1; i >= 0; i--) if (localDate(new Date(log[i])) === t) { log.splice(i, 1); break; }
   return { ...db, waterLog: log };
 }
-// Тренировки с часов: добавляем новые и обновляем уже известные (по id записи в Health Connect)
-export function mergeWatchWorkouts(db, list) {
+// Удалить тренировку (любую, в т.ч. с часов)
+export function removeWorkout(db, w) { return { ...db, workouts: db.workouts.filter(x => x !== w) }; }
+// Тренировки с часов, которых ещё нет в приложении
+export function newWatchWorkouts(db, list) {
+  const have = new Set(db.workouts.filter(w => w.hcId).map(w => w.hcId));
+  return (list || []).filter(w => !have.has(w.hcId)).sort((a, b) => b.start.localeCompare(a.start));
+}
+// Тренировки с часов: обновляем уже добавленные (по id записи в Health Connect).
+// Новые добавляются, только если add = true (когда пользователь сам выбрала тренировку).
+export function mergeWatchWorkouts(db, list, add = true) {
   const byId = new Map(db.workouts.filter(w => w.hcId).map(w => [w.hcId, w]));
   let changed = false;
   const workouts = db.workouts.map(w => {
@@ -249,7 +291,7 @@ export function mergeWatchWorkouts(db, list) {
     if (n && (n.kcal !== w.kcal || n.duration !== w.duration || n.distanceKm !== w.distanceKm)) { changed = true; return { ...w, ...n }; }
     return w;
   });
-  for (const n of list) if (!byId.has(n.hcId)) { workouts.push(n); changed = true; }
+  if (add) for (const n of list) if (!byId.has(n.hcId)) { workouts.push(n); changed = true; }
   return changed ? { ...db, workouts } : db;
 }
 

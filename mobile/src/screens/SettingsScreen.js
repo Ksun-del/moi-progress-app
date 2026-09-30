@@ -9,9 +9,10 @@ import { useStore } from '../store';
 import { C } from '../theme';
 import { Btn, Card, Field, Icon, Round, Section, T } from '../ui';
 import { emptyDb, today } from '../logic/core';
+import * as Cloud from '../logic/cloud';
 
 export default function SettingsScreen({ visible, onClose, watchState, onConnectWatch, onOpenHealth, onSync }) {
-  const { db, update, replace } = useStore();
+  const { db, update, replace, cloud } = useStore();
   const [rem, setRem] = useState({ name: '', type: 'daily', time: '09:00', hours: '8' });
   const st = db.settings;
   const set = (patch) => update(d => ({ ...d, settings: { ...d.settings, ...patch } }));
@@ -67,7 +68,7 @@ export default function SettingsScreen({ visible, onClose, watchState, onConnect
           <Card style={{ gap: 12 }}>
             {watchState === 'on' ? (
               <>
-                <T>Подключено. Тренировки, шаги и вес подтягиваются из Health Connect при каждом открытии приложения.</T>
+                <T>Подключено. Шаги и вес подтягиваются сами. Тренировки с часов добавляете сами: «+ Тренировка» на экране «Сегодня».</T>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <Btn title="Обновить сейчас" small onPress={onSync} style={{ flex: 1 }} />
                   <Btn title="Health Connect" kind="ghost" small onPress={onOpenHealth} style={{ flex: 1 }} />
@@ -155,9 +156,12 @@ export default function SettingsScreen({ visible, onClose, watchState, onConnect
             <Btn title="+ Добавить напоминание" onPress={addReminder} disabled={!rem.name.trim()} />
           </Card>
 
+          <Section title="Облако" />
+          <CloudCard />
+
           <Section title="Данные" />
           <Card style={{ gap: 10 }}>
-            <T size={14} color={C.muted}>Все данные хранятся только в этом телефоне. Время от времени сохраняйте копию.</T>
+            <T size={14} color={C.muted}>{cloud.cfg ? 'Можно дополнительно сохранить копию в файл.' : 'Пока облако не подключено, данные есть только в этом телефоне. Время от времени сохраняйте копию.'}</T>
             <Btn title="Сохранить резервную копию" onPress={exportData} />
             <Btn title="Загрузить из копии" kind="ghost" onPress={importData} />
             <Btn title="Удалить все данные" kind="danger" onPress={resetAll} />
@@ -166,4 +170,82 @@ export default function SettingsScreen({ visible, onClose, watchState, onConnect
       </SafeAreaView>
     </Modal>
   );
+}
+
+// Облако: адрес сервера и ключ, статус, копии по дням
+function CloudCard() {
+  const { cloud, syncNow, checkCloud, connectCloud, disconnectCloud, replace } = useStore();
+  const [url, setUrl] = useState('');
+  const [key, setKey] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const [days, setDays] = useState(null);
+
+  async function connect() {
+    setBusy(true); setErr(null);
+    try {
+      const { cfg, remote } = await checkCloud(url, key);
+      if (remote.db) {
+        Alert.alert('В облаке уже есть данные', `Сохранены ${fmtTime(remote.updatedAt)}. Что оставить?`, [
+          { text: 'Отмена', style: 'cancel' },
+          { text: 'Данные телефона', onPress: () => connectCloud(cfg, remote, 'phone') },
+          { text: 'Из облака', onPress: () => connectCloud(cfg, remote, 'cloud') },
+        ]);
+      } else await connectCloud(cfg, remote, 'phone');
+    } catch (e) { setErr(e.message); }
+    setBusy(false);
+  }
+  async function showDays() {
+    try { setDays(await Cloud.backups(cloud.cfg)); } catch (e) { Alert.alert('Не получилось', e.message); }
+  }
+  async function restore(day) {
+    Alert.alert(`Вернуть данные на ${day}?`, 'Текущие данные заменятся копией на начало этого дня.', [
+      { text: 'Отмена', style: 'cancel' },
+      { text: 'Вернуть', onPress: async () => {
+        try { const b = await Cloud.backup(cloud.cfg, day); if (b && b.db) { replace(b.db); setDays(null); } }
+        catch (e) { Alert.alert('Не получилось', e.message); }
+      } },
+    ]);
+  }
+
+  if (!cloud.cfg) return (
+    <Card style={{ gap: 12 }}>
+      <T size={14} color={C.muted}>Данные будут храниться в облаке Cloudflare. Если телефон потеряется или сломается, на новом введёте адрес и ключ, и всё вернётся.</T>
+      <Field label="Адрес сервера" value={url} onChangeText={setUrl} placeholder="moi-progress-sync….workers.dev" autoCapitalize="none" autoCorrect={false} keyboardType="url" />
+      <Field label="Ключ" value={key} onChangeText={setKey} autoCapitalize="none" autoCorrect={false} secureTextEntry />
+      {err ? <T size={14} color={C.bad}>{err}</T> : null}
+      <Btn title={busy ? 'Проверяю…' : 'Подключить облако'} disabled={busy || !url.trim() || !key.trim()} onPress={connect} />
+    </Card>
+  );
+  return (
+    <Card style={{ gap: 12 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: cloud.status === 'ok' ? C.ok : cloud.status === 'error' ? C.bad : C.accent }} />
+        <T w="s" style={{ flex: 1 }}>
+          {cloud.status === 'ok' ? `Всё сохранено в облаке${cloud.at ? ' · ' + fmtTime(cloud.at) : ''}`
+            : cloud.status === 'saving' ? 'Сохраняю в облако…'
+            : `Не сохранилось: ${cloud.error || 'нет связи'}. Повторю сама.`}
+        </T>
+      </View>
+      <T size={13} color={C.muted}>Главная копия — в облаке. В телефоне рабочая копия, чтобы приложение работало без интернета. Каждый день в облаке остаётся отдельная копия (хранятся 90 дней).</T>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <Btn title="Сохранить сейчас" small style={{ flex: 1 }} onPress={syncNow} />
+        <Btn title="Копии по дням" kind="ghost" small style={{ flex: 1 }} onPress={showDays} />
+      </View>
+      {days ? (days.length ? days.map(d => (
+        <Pressable key={d} onPress={() => restore(d)} accessibilityRole="button" style={{ flexDirection: 'row', paddingVertical: 10, borderTopWidth: 1, borderColor: C.line }}>
+          <T style={{ flex: 1 }}>{d.split('-').reverse().join('.')}</T><T w="s" color={C.accentText}>Вернуть</T>
+        </Pressable>
+      )) : <T size={13} color={C.muted}>Копий пока нет.</T>) : null}
+      <Btn title="Отключить облако" kind="clear" small onPress={() => Alert.alert('Отключить облако?', 'Данные в облаке останутся, но новые изменения туда уходить не будут.', [
+        { text: 'Отмена', style: 'cancel' }, { text: 'Отключить', onPress: disconnectCloud },
+      ])} />
+    </Card>
+  );
+}
+
+function fmtTime(t) {
+  const d = new Date(t);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${p(d.getDate())}.${p(d.getMonth() + 1)} в ${d.getHours()}:${p(d.getMinutes())}`;
 }

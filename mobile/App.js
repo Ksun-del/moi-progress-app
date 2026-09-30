@@ -1,5 +1,6 @@
 // «Мой прогресс» — приложение для Android.
-// Три экрана (Сегодня / Еда / Прогресс) + настройки. Тренировки подтягиваются с часов через Health Connect,
+// Три экрана (Сегодня / Еда / Прогресс) + настройки. Шаги и вес подтягиваются с часов через Health Connect,
+// тренировки с часов добавляются только кнопкой «+ Тренировка»,
 // напоминания ставит сам телефон, данные хранятся в памяти телефона.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, BackHandler, Pressable, View } from 'react-native';
@@ -42,7 +43,7 @@ function Main() {
   const [steps, setSteps] = useState(null);
   const syncing = useRef(false);
 
-  // Данные с часов: тренировки, шаги, вес
+  // Данные с часов: шаги, вес; у уже добавленных тренировок обновляются калории
   const sync = useCallback(async () => {
     if (syncing.current) return;
     syncing.current = true;
@@ -52,7 +53,7 @@ function Main() {
       if (!(await Health.hasAccess())) { setWatch('off'); return; }
       setWatch('on');
       const list = await Health.readWorkouts(14);
-      if (list && list.length) update(d => mergeWatchWorkouts(d, list));
+      if (list && list.length) update(d => mergeWatchWorkouts(d, list, false));
       setSteps(await Health.readStepsToday());
       const ws = await Health.readWeights(30);
       if (ws.length) update(d => {
@@ -97,7 +98,7 @@ function Main() {
       <View style={{ flex: 1 }}>
         {tab === 'today' ? <TodayScreen onOpenSettings={() => setSettings(true)} onOpenFood={() => setTab('food')} steps={steps} watchState={watch} onConnectWatch={connect} /> : null}
         {tab === 'food' ? <FoodScreen /> : null}
-        {tab === 'progress' ? <ProgressScreen /> : null}
+        {tab === 'progress' ? <ProgressScreen watchState={watch} /> : null}
       </View>
       <SafeAreaView edges={['bottom']} style={{ backgroundColor: C.card, borderTopWidth: 1, borderColor: '#ece6dd' }}>
         <View style={{ height: 72, flexDirection: 'row', alignItems: 'center' }} accessibilityRole="tablist">

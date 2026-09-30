@@ -69,6 +69,7 @@ ok('норма растёт на половину сожжённого с час
 });
 
 ok('подсказка на ужин укладывается в остаток и добирает белок', () => {
+  const TODAY = L.today(); // подсказка бывает только на сегодня
   let db = freshDb();
   db = L.mergeWatchWorkouts(db, [{ hcId: 'a1', source: 'watch', date: TODAY, kind: 'run', duration: 42, kcal: 380 }]);
   db = L.setSlot(db, TODAY, 0, 'plan'); db = L.setSlot(db, TODAY, 1, 'plan'); db = L.setSlot(db, TODAY, 2, 'plan');
@@ -96,6 +97,49 @@ ok('вода и неделя', () => {
   assert.equal(L.waterCount(db, L.today()), 1);
   const w = L.weekStats(db, TODAY);
   assert.equal(w.days.length, 7);
+});
+
+ok('тренировки с часов сами не добавляются, только обновляются', () => {
+  let db = freshDb();
+  const w = { hcId: 'w1', source: 'watch', date: TODAY, start: TODAY + 'T08:00:00Z', kind: 'walk', duration: 30, kcal: 90 };
+  db = L.mergeWatchWorkouts(db, [w], false);
+  assert.equal(db.workouts.length, 0);
+  assert.equal(L.newWatchWorkouts(db, [w]).length, 1);
+  db = L.mergeWatchWorkouts(db, [w], true);
+  assert.equal(db.workouts.length, 1);
+  assert.equal(L.newWatchWorkouts(db, [w]).length, 0);
+  db = L.mergeWatchWorkouts(db, [{ ...w, kcal: 120 }], false);
+  assert.equal(db.workouts[0].kcal, 120);
+  db = L.removeWorkout(db, db.workouts[0]);
+  assert.equal(db.workouts.length, 0);
+  // старая автоматически добавленная ходьба убирается один раз
+  const old = L.normalizeDb({ workouts: [w, { ...w, hcId: 'r1', kind: 'run' }, { date: TODAY, kind: 'walk', duration: 20, source: 'manual' }] });
+  assert.deepStrictEqual(old.workouts.map(x => x.hcId || 'manual'), ['r1', 'manual']);
+  const again = L.normalizeDb({ ...old, workouts: [...old.workouts, w] });
+  assert.equal(again.workouts.length, 3);
+});
+
+ok('тарелка: несколько продуктов в одну запись', () => {
+  const db = freshDb();
+  const p = L.parseFoodText(db, 'лепешка фарш и овощи');
+  assert.deepStrictEqual(p.map(x => x.product.n), ['Лепёшка пшеничная', 'Фарш (свинина + говядина)', 'Овощи свежие']);
+  assert.deepStrictEqual(L.parseFoodText(db, 'говяжий фарш 100 г').map(x => x.product.n), ['Говяжий фарш']);
+  assert.deepStrictEqual(L.parseFoodText(db, 'молоко 3,2% 200 мл').map(x => [x.product.n, x.grams]), [['Молоко 3,2%', 200]]);
+  assert.equal(L.parseFoodText(db, 'творог 5%')[0].grams, 100);
+  const t = L.plateTotal([{ name: 'Гречка варёная 150 г', cal: 165, protein: 6.3 }, { name: 'Обед: Куриная грудка — 120 г', cal: 164, protein: 35.8 }]);
+  assert.deepStrictEqual(t, { name: 'Гречка варёная 150 г + куриная грудка', cal: 329, protein: 42.1 });
+  assert.equal(L.plateTotal([{ name: 'Борщ', cal: 250, protein: 10 }]).name, 'Борщ');
+  assert.equal(L.plateTotal([{ name: 'Борщ', cal: 250, protein: 10 }], 'Мой обед').name, 'Мой обед — Борщ');
+});
+
+ok('крупы по умолчанию — готовые, сухие — только со словом «сухой»/«хлопья»', () => {
+  const db = freshDb();
+  const n = (q) => L.parseFoodText(db, q)[0].product.n;
+  assert.equal(n('овсянка 200'), 'Овсянка готовая (на воде)');
+  assert.equal(n('пшенка 200'), 'Пшённая каша готовая (на воде)');
+  assert.equal(n('гречка 100'), 'Гречка варёная');
+  assert.equal(n('овсяные хлопья 40'), 'Овсяные хлопья (сухие)');
+  assert.equal(n('гречка сухая 50'), 'Гречка сухая');
 });
 
 console.log(`\nВсе проверки пройдены: ${n} ✓`);
