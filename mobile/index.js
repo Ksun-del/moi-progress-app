@@ -1,4 +1,6 @@
 import { registerRootComponent } from 'expo';
+// Фоновая задача для кнопки «✓ Выпила» должна объявляться сразу при загрузке
+import './src/logic/notify';
 
 import App from './App';
 

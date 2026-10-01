@@ -5,6 +5,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, BackHandler, Pressable, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import * as SplashScreen from 'expo-splash-screen';
+import * as Notifications from 'expo-notifications';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useFonts, Onest_400Regular, Onest_500Medium, Onest_600SemiBold, Onest_700Bold, Onest_800ExtraBold } from '@expo-google-fonts/onest';
 import { StoreProvider, useStore } from './src/store';
@@ -14,9 +16,14 @@ import TodayScreen from './src/screens/TodayScreen';
 import FoodScreen from './src/screens/FoodScreen';
 import ProgressScreen from './src/screens/ProgressScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
-import { setupNotifications, scheduleReminders } from './src/logic/notify';
+import { setupNotifications, scheduleReminders, handleNotificationResponse } from './src/logic/notify';
 import * as Health from './src/logic/health';
 import { mergeWatchWorkouts } from './src/logic/core';
+
+// Заставка держится, пока не загрузятся шрифты и данные — без пустого экрана между ними
+SplashScreen.preventAutoHideAsync().catch(() => {});
+SplashScreen.setOptions({ fade: true, duration: 300 });
+setTimeout(() => SplashScreen.hideAsync().catch(() => {}), 6000); // на всякий случай
 
 export default function App() {
   const [fonts] = useFonts({ Onest_400Regular, Onest_500Medium, Onest_600SemiBold, Onest_700Bold, Onest_800ExtraBold });
@@ -73,10 +80,14 @@ function Main() {
 
   useEffect(() => {
     setupNotifications().catch(() => {});
+    // «✓ Выпила» нажата, пока приложение открыто или свёрнуто
+    const resp = Notifications.addNotificationResponseReceivedListener(r => { handleNotificationResponse(r).catch(() => {}); });
     sync();
     const sub = AppState.addEventListener('change', st => { if (st === 'active') sync(); });
-    return () => sub.remove();
+    return () => { sub.remove(); resp.remove(); };
   }, [sync]);
+
+  useEffect(() => { if (db) SplashScreen.hideAsync().catch(() => {}); }, [!!db]);
 
   // Напоминания пересчитываются при изменении данных (функция сама пропускает, если ничего не поменялось)
   useEffect(() => { if (db) scheduleReminders(db).catch(() => {}); }, [db]);
