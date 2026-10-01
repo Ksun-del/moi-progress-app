@@ -4,10 +4,11 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { normalizeDb, emptyDb } from './logic/core';
+import { normalizeDb, emptyDb, DB_KEY } from './logic/core';
+import { setLiveUpdate } from './logic/notify';
 import * as Cloud from './logic/cloud';
 
-const KEY = 'myProgressV2';
+const KEY = DB_KEY;
 const Ctx = createContext(null);
 const stamp = (d) => ({ ...d, _updatedAt: Date.now() });
 
@@ -76,6 +77,8 @@ export function StoreProvider({ children }) {
   }, [db, syncNow]);
 
   const update = useCallback((fn) => setDb(prev => { if (!prev) return prev; const n = fn(prev); return n === prev ? prev : stamp(n); }), []);
+  // Кнопка «✓ Выпила» в уведомлении, пока приложение открыто или свёрнуто, пишет сюда
+  useEffect(() => { setLiveUpdate(update); return () => setLiveUpdate(null); }, [update]);
   const replace = useCallback((next) => setDb(stamp(normalizeDb(next))), []);
 
   // Подключить облако. Сначала checkCloud (проверка адреса и ключа, что уже лежит в облаке),
