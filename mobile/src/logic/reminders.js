@@ -8,6 +8,7 @@
 // Возвращает список:
 //   { kind: 'date',  at: Date, title, body }            — один раз в указанное время
 //   { kind: 'daily', hour, minute, title, body }        — каждый день
+// У своих напоминаний есть ещё rid — по нему кнопка «✓ Выпила» в уведомлении понимает, что отметить.
 
 const NIGHT_FROM = 23; // с 23:00 до 8:00 про воду не напоминаем
 const NIGHT_TO = 8;
@@ -62,13 +63,14 @@ function planReminders(s, now = new Date()) {
   // Свои напоминания (таблетки и т.п.)
   (s.customReminders || []).forEach(r => {
     const title = '💊 ' + (r.name || 'Напоминание');
-    const body = 'Напоминание из приложения «Мой прогресс».';
+    const body = ''; // только название — без лишней строчки
+    const extra = { rid: r.id };
     if (r.type === 'daily') {
       const [hour, minute] = String(r.time || '09:00').split(':').map(Number);
-      out.push({ kind: 'daily', hour: hour || 0, minute: minute || 0, title, body });
+      out.push({ kind: 'daily', hour: hour || 0, minute: minute || 0, title, body, ...extra });
     } else if (r.type === 'interval' && r.lastLog && r.hours > 0) {
       const at = new Date(new Date(r.lastLog).getTime() + r.hours * 3600000);
-      if (at > now) out.push({ kind: 'date', at, title, body });
+      if (at > now) out.push({ kind: 'date', at, title, body, ...extra });
     }
   });
 

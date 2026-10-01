@@ -30,6 +30,29 @@ export function plural(n, one, few, many) {
   return many;
 }
 
+// Ключ, под которым данные лежат в памяти телефона
+export const DB_KEY = 'myProgressV2';
+
+// ---------- Свои напоминания: «✓ Выпила» ----------
+// Отметить, что напоминание выполнено (кнопкой в уведомлении или в настройках).
+// Для «каждые N часов» отсчёт начинается заново с этого момента.
+export function markReminderDone(db, id, at = new Date()) {
+  const iso = at.toISOString();
+  let hit = false;
+  const list = (db.customReminders || []).map(r => {
+    if (r.id !== id) return r;
+    hit = true;
+    const done = [...(r.done || []), iso].slice(-60);
+    return r.type === 'interval' ? { ...r, lastLog: iso, done } : { ...r, done };
+  });
+  return hit ? { ...db, customReminders: list } : db;
+}
+// Время отметок за день: ['9:05', ...]
+export function doneTimes(r, day = today()) {
+  return (r.done || []).map(x => new Date(x)).filter(d => localDate(d) === day)
+    .map(d => d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0'));
+}
+
 // ---------- Настройки по умолчанию ----------
 export const DEFAULT_SETTINGS = {
   start: 66, target: 58,
