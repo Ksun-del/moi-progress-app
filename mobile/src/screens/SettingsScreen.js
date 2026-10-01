@@ -8,7 +8,7 @@ import { File, Paths } from 'expo-file-system';
 import { useStore } from '../store';
 import { C } from '../theme';
 import { Btn, Card, Field, Icon, Round, Section, T } from '../ui';
-import { emptyDb, today } from '../logic/core';
+import { emptyDb, today, markReminderDone, doneTimes } from '../logic/core';
 import * as Cloud from '../logic/cloud';
 
 export default function SettingsScreen({ visible, onClose, watchState, onConnectWatch, onOpenHealth, onSync }) {
@@ -134,8 +134,9 @@ export default function SettingsScreen({ visible, onClose, watchState, onConnect
                 <View style={{ flex: 1 }}>
                   <T w="s">{r.name}</T>
                   <T size={13} color={C.muted}>{r.type === 'daily' ? `каждый день в ${r.time}` : `каждые ${r.hours} ч после отметки`}</T>
+                  {doneTimes(r).length ? <T size={13} color={C.ok} w="s">✓ сегодня в {doneTimes(r).join(', ')}</T> : null}
                 </View>
-                {r.type === 'interval' ? <Btn title="Приняла" kind="ghost" small onPress={() => update(d => ({ ...d, customReminders: d.customReminders.map(x => x.id === r.id ? { ...x, lastLog: new Date().toISOString() } : x) }))} /> : null}
+                <Btn title="Приняла" kind="ghost" small onPress={() => update(d => markReminderDone(d, r.id))} />
                 <Pressable hitSlop={10} accessibilityLabel="Удалить напоминание" onPress={() => update(d => ({ ...d, customReminders: d.customReminders.filter(x => x.id !== r.id) }))}>
                   <Icon name="trash" color={C.muted} size={18} />
                 </Pressable>
