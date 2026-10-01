@@ -142,4 +142,21 @@ ok('крупы по умолчанию — готовые, сухие — тол
   assert.equal(n('гречка сухая 50'), 'Гречка сухая');
 });
 
+// ---------- «✓ Выпила» ----------
+ok('свои напоминания: без строчки «Напоминание из приложения», с кнопкой (rid)', () => {
+  const p = planReminders({ customReminders: [{ id: 'a1', name: 'Витамин D', type: 'daily', time: '09:30' }] }, at('2026-10-01T08:00:00'));
+  assert.equal(p.length, 1);
+  assert.equal(p[0].title, '💊 Витамин D');
+  assert.equal(p[0].body, '');
+  assert.equal(p[0].rid, 'a1');
+});
+ok('отметка «выпила»: ежедневное — запись времени, «каждые N часов» — отсчёт заново', () => {
+  let db = L.normalizeDb({ customReminders: [{ id: 'a', name: 'D', type: 'daily', time: '09:00' }, { id: 'b', name: 'X', type: 'interval', hours: 8, lastLog: '2026-10-01T00:00:00.000Z' }] });
+  const t = at('2026-10-01T09:05:00');
+  db = L.markReminderDone(L.markReminderDone(db, 'a', t), 'b', t);
+  assert.deepStrictEqual(L.doneTimes(db.customReminders[0], '2026-10-01'), ['9:05']);
+  assert.equal(db.customReminders[1].lastLog, t.toISOString());
+  assert.equal(L.markReminderDone(db, 'нет такого', t), db);
+});
+
 console.log(`\nВсе проверки пройдены: ${n} ✓`);
